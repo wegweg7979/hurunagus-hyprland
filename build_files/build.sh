@@ -93,11 +93,30 @@ EXTRA_PACKAGES=(
     fprintd
     kf6-kimageformats
     libatomic
-    hermes
 )
 
 # Hermes Desktop (GUI) - download from GitHub releases (not in Fedora repos)
 HERMES_DESKTOP_URL="https://github.com/fathah/hermes-desktop/releases/download/v0.7.7/hermes-desktop-0.7.7.rpm"
+
+echo "::group:: Installing Hermes Agent and Desktop"
+# Install Hermes Agent using official install script (not available as RPM)
+echo "Installing Hermes Agent via official installer..."
+curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --no-prompt 2>/dev/null || \
+    echo "warning: Hermes Agent installation failed" >&2
+
+# Install Hermes Desktop RPM
+if [[ ! -f /tmp/hermes-desktop.rpm ]]; then
+    curl -fsSL -o /tmp/hermes-desktop.rpm "${HERMES_DESKTOP_URL}" || \
+        echo "warning: failed to download hermes-desktop RPM" >&2
+fi
+
+if [[ -f /tmp/hermes-desktop.rpm ]]; then
+    dnf5 install -y --nogpgcheck /tmp/hermes-desktop.rpm || \
+        echo "warning: hermes-desktop installation failed or not available" >&2
+    rm -f /tmp/hermes-desktop.rpm
+fi
+
+echo "::endgroup::"
 
 install_packages() {
     local failed=() package required_failed=0
@@ -137,29 +156,13 @@ install_packages() {
     return 0
 }
 
-echo "::group:: Installing Hermes Agent and Desktop"
+echo "::group:: Installing the Omarchy desktop packages"
 install_packages "${PACKAGES[@]}" "${EXTRA_PACKAGES[@]}"
-
-# Download and install Hermes Desktop RPM
-if [[ ! -f /tmp/hermes-desktop.rpm ]]; then
-    curl -fsSL -o /tmp/hermes-desktop.rpm "${HERMES_DESKTOP_URL}" || \
-        echo "warning: failed to download hermes-desktop RPM" >&2
-fi
-
-if [[ -f /tmp/hermes-desktop.rpm ]]; then
-    dnf5 install -y --nogpgcheck /tmp/hermes-desktop.rpm || \
-        echo "warning: hermes-desktop installation failed or not available" >&2
-    rm -f /tmp/hermes-desktop.rpm
-fi
-
 echo "::endgroup::"
 
 # ---------------------------------------------------------------------------
 # Hurunagus system files, SDDM theme, session and first-boot services
 # ---------------------------------------------------------------------------
-echo "::group:: Installing the Omarchy desktop packages"
-install_packages "${PACKAGES[@]}" "${EXTRA_PACKAGES[@]}"
-echo "::endgroup::"
 
 # ---------------------------------------------------------------------------
 # Hurunagus system files, SDDM theme, session and first-boot services
