@@ -40,7 +40,42 @@ if [[ -s /tmp/hurunagus-coprs.txt ]]; then
 fi
 
 mapfile -t PACKAGES < /tmp/hurunagus-packages.txt
-echo "Resolved ${#PACKAGES[@]} packages"
+
+# Packages we deliberately do not ship, even though Omarchy's base list
+# includes them:
+#
+#   * chromium, kdenlive, obs-studio are duplicated by the system Flatpaks
+#     in system-flatpaks.list.
+#   * The rest are Omarchy preinstalled apps that upstream itself offers to
+#     remove via omarchy-remove-preinstalls (libreoffice-fresh maps to
+#     libreoffice on Fedora).
+#
+# Keep this filter here instead of editing omarchy-base.packages so the
+# vendored Omarchy list stays easy to compare with upstream.
+EXCLUDED_PACKAGES=(
+    chromium
+    kdenlive
+    obs-studio
+    libreoffice
+    xournalpp
+    omacut
+    omacalc
+    omawrite
+    lazydocker
+)
+
+filtered_packages=()
+for package in "${PACKAGES[@]}"; do
+    for excluded in "${EXCLUDED_PACKAGES[@]}"; do
+        if [[ "${package}" == "${excluded}" ]]; then
+            continue 2
+        fi
+    done
+    filtered_packages+=("${package}")
+done
+PACKAGES=("${filtered_packages[@]}")
+
+echo "Resolved ${#PACKAGES[@]} packages after exclusions"
 echo "::endgroup::"
 
 # Packages that are not in Omarchy's lists but that this bootc image needs:
@@ -58,7 +93,11 @@ EXTRA_PACKAGES=(
     fprintd
     kf6-kimageformats
     libatomic
+    hermes
 )
+
+# Hermes Desktop (GUI) - download from GitHub releases (not in Fedora repos)
+HERMES_DESKTOP_URL="https://github.com/fathah/hermes-desktop/releases/download/v0.7.7/hermes-desktop-0.7.7.rpm"
 
 install_packages() {
     local failed=() package required_failed=0
@@ -98,6 +137,26 @@ install_packages() {
     return 0
 }
 
+echo "::group:: Installing Hermes Agent and Desktop"
+install_packages "${PACKAGES[@]}" "${EXTRA_PACKAGES[@]}"
+
+# Download and install Hermes Desktop RPM
+if [[ ! -f /tmp/hermes-desktop.rpm ]]; then
+    curl -fsSL -o /tmp/hermes-desktop.rpm "${HERMES_DESKTOP_URL}" || \
+        echo "warning: failed to download hermes-desktop RPM" >&2
+fi
+
+if [[ -f /tmp/hermes-desktop.rpm ]]; then
+    dnf5 install -y --nogpgcheck /tmp/hermes-desktop.rpm || \
+        echo "warning: hermes-desktop installation failed or not available" >&2
+    rm -f /tmp/hermes-desktop.rpm
+fi
+
+echo "::endgroup::"
+
+# ---------------------------------------------------------------------------
+# Hurunagus system files, SDDM theme, session and first-boot services
+# ---------------------------------------------------------------------------
 echo "::group:: Installing the Omarchy desktop packages"
 install_packages "${PACKAGES[@]}" "${EXTRA_PACKAGES[@]}"
 echo "::endgroup::"
