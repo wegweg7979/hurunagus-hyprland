@@ -95,6 +95,10 @@ EXTRA_PACKAGES=(
     libatomic
 )
 
+# Brave browser repo
+dnf5 -y config-manager addrepo --from-repofile=https://brave-browser-rpm-release.s3.brave.com/brave-browser.repo
+dnf5 -y install brave-origin
+
 # Hermes Desktop (GUI) - download from GitHub releases (not in Fedora repos)
 HERMES_DESKTOP_URL="https://github.com/fathah/hermes-desktop/releases/download/v0.7.7/hermes-desktop-0.7.7.rpm"
 
