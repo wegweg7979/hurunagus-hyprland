@@ -13,6 +13,12 @@ FROM ghcr.io/ublue-os/base-main:latest
 # fedora-45-x86_64 only. base-main:latest is Fedora 44 at the time of writing;
 # pin a date tag here if you need a reproducible build.
 
+### [IM]MUTABLE /opt
+## Fedora's base image symlinks /opt -> /var/opt. RPMs such as brave-origin
+## unpack into /opt and fail with "cpio: mkdir failed - File exists" unless
+## /opt is a real directory.
+RUN rm /opt && mkdir /opt
+
 ### MODIFICATIONS
 ## Everything (packages, SDDM, Omarchy defaults, Hurunagus overrides) happens in
 ## build.sh. It is mounted at /ctx so it can see build_files/ and system_files/.
