@@ -1,0 +1,84 @@
+#!/bin/bash
+# omarchy-update — Custom Fedora/rpm-ostree variant for hurunagus-hyprland
+#
+# This script replaces the Arch/pacman-based omarchy-update that ships with
+# the Omarchy package. It detects the distribution and, on Fedora (rpm-ostree
+# / immutable systems), runs `ujust update` instead of the pacman-based update
+# flow.
+#
+# Why: The default omarchy-update is designed for Arch Linux (pacman +
+# aur + pacstrap). On Fedora with rpm-ostree, `pacman` does not exist, so
+# `omarchy update` fails with "command not found: pacman" errors.
+#
+# This custom script:
+#   1. Detects the distribution (Arch vs Fedora)
+#   2. On Fedora, delegates to `ujust update` which runs:
+#      - rpm-ostree update       (immutable OS update)
+#      - flatpak update -y       (Flatpak package updates)
+#      - distrobox upgrade -a    (distrobox container upgrades)
+#   3. On Arch/other, falls back to the original Omarchy updater.
+
+set -uo pipefail
+
+# ---------------------------------------------------------------------------
+# Detect distribution (same logic as omsarchy-distro)
+# ---------------------------------------------------------------------------
+OMARCHY_DISTRO="${OMARCHY_DISTRO:-}"
+
+if [[ -z "${OMARCHY_DISTRO:-}" ]]; then
+  id=""
+  id_like=""
+  if [[ -r /etc/os-release ]]; then
+    while IFS='=' read -r key value; do
+      # Strip surrounding quotes from value
+      value="${value%"}"
+      value="${value#"}"
+      case "$key" in
+        ID)      id="$value" ;;
+        ID_LIKE) id_like="$value" ;;
+      esac
+    done < /etc/os-release
+  fi
+
+  case "$id" in
+    arch)   OMARCHY_DISTRO=arch ;;
+    fedora) OMARCHY_DISTRO=fedora ;;
+  esac
+
+  # Fallback: check ID_LIKE
+  for token in $id_like; do
+    case "$token" in
+      fedora) OMARCHY_DISTRO=fedora; break ;;
+      arch)   OMARCHY_DISTRO=arch; break ;;
+    esac
+  done
+fi
+
+echo "omarchy-update: detected OMARCHY_DISTRO=${OMARCHY_DISTRO:-unknown}"
+
+# ---------------------------------------------------------------------------
+# Fedora (rpm-ostree) path — run ujust update
+# ---------------------------------------------------------------------------
+if [[ "${OMARCHY_DISTRO:-}" == "fedora" ]]; then
+  echo -e "\e[32mRunning ujust update (rpm-ostree + flatpak + distrobox)...\e[0m"
+
+  # Ensure ujust (just) is available
+  if ! command -v ujust &>/dev/null; then
+    echo "ERROR: ujust command not found. Please install 'just' (ujust is a symlink/install alias)." >&2
+    exit 1
+  fi
+
+  # Run ujust update — this handles:
+  #   - rpm-ostree update      (immutable OS, staged deployment)
+  #   - flatpak update -y      (user + system Flatpaks)
+  #   - distrobox upgrade -a   (container upgrades)
+  ujust update
+
+  exit $?
+fi
+
+# ---------------------------------------------------------------------------
+# Arch / other path — fall back to original Omarchy updater
+# ---------------------------------------------------------------------------
+echo -e "\e[33mRunning Arch-style omarchy update (fallback)...\e[0m"
+exec /usr/sbin/omarchy-update "$@"
