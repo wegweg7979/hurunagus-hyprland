@@ -1,0 +1,155 @@
+#!/bin/bash
+#
+# Fedora sibling of bin/omarchy-update-available (exec'd by its distro
+# dispatch). Same CONTRACT as upstream so the shell update widget works
+# unchanged:
+#   - writes  ~/.local/state/omarchy/updates/{packages,aur,available,checked-at}
+#     (+ error on failure, removed on success)
+#   - exit 0  -> updates available, stdout is the list
+#   - exit !0 -> up to date ("System is up to date" on stdout)
+#
+# TWO MODES, selected by whether the host is immutable (bootc/rpm-ostree):
+#
+#   immutable (/run/ostree-booted exists)  = a bootc image deployment.
+#     OS updates arrive as NEW container images. Two signals, primary first:
+#       1. A NEWER deployment is already staged on disk (rpm-ostreed-
+#          automatic.timer pulled it behind the scenes) -> "reboot to apply".
+#       2. Otherwise, compare the booted deployment's
+#          container-image-reference-digest against the remote image digest
+#          (skopeo) -> a newer image was published upstream.
+#
+#   mutable (no /run/ostree-booted)        = classic omedora/base Fedora.
+#     Original behavior: `dnf check-upgrade` restricted to the omedora COPR
+#     (exit 100 = updates, 0 = none). aur file stays empty (widget parity).
+#
+# Override knobs (kept for tests): OMEDORA_DNF_CMD, OMEDORA_COPR_REPO_ID,
+# OMARCHY_IMAGE_REF (docker:// ref to poll; default = the deployment's own
+# container-image-reference), OMARCHY_UPDATE_CHECK_TIMEOUT.
+
+set -euo pipefail
+
+CHECK_TIMEOUT="${OMARCHY_UPDATE_CHECK_TIMEOUT:-60}"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/updates"
+mkdir -p "$STATE_DIR"
+
+tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/omarchy-update-available.XXXXXX")
+trap 'rm -rf "$tmp_dir"' EXIT
+packages_tmp="$tmp_dir/packages"
+: >"$packages_tmp"
+
+strip_ansi() { sed -E 's/\x1B\[[0-9;]*m//g' | sed '/^[[:space:]]*$/d'; }
+
+# write_state <available_list> [error_msg] — mirrors upstream file set exactly
+write_state() {
+  local list=$1 err=${2:-}
+  if [[ -n $list ]]; then
+    printf '%s\n' "$list" >"$packages_tmp"
+  else
+    : >"$packages_tmp"
+  fi
+  cp "$packages_tmp" "$STATE_DIR/packages"
+  : >"$STATE_DIR/aur"
+  cp "$packages_tmp" "$STATE_DIR/available"
+  date --iso-8601=seconds >"$STATE_DIR/checked-at"
+  if [[ -n $err ]]; then
+    printf '%s\n' "$err" >"$STATE_DIR/error"
+  else
+    rm -f "$STATE_DIR/error"
+  fi
+  if [[ -s "$STATE_DIR/available" ]]; then
+    cat "$STATE_DIR/available"
+    exit 0
+  fi
+  [[ -s "$STATE_DIR/error" ]] && cat "$STATE_DIR/error" >&2
+  echo "System is up to date"
+  exit 1
+}
+
+ostree_json() { rpm-ostree status --json 2>/dev/null || true; }
+
+# ---------------------------------------------------------------------------
+# IMMUTABLE (bootc) — newest-deployment / remote-digest detection.
+# ---------------------------------------------------------------------------
+immutable_check() {
+  local json newest newest_ts booted_ts booted_digest raw_ref image_ref remote_digest
+  json=$(ostree_json)
+  if [[ -z $json ]]; then
+    write_state "" "rpm-ostree status failed"
+  fi
+
+  # Booted deployment: its image digest is the anchor for every comparison.
+  booted_digest=$(printf '%s' "$json" |
+    jq -r '.deployments[] | select(.booted==true) | ."container-image-reference-digest" // empty' | head -1)
+
+  # Signal 1: a newer deployment already staged at the next boot slot.
+  # A rollback sibling is OLDER (lower timestamp), so max_by(timestamp) only
+  # returns a newer-than-booted object when an actual update was pulled.
+  newest=$(printf '%s' "$json" | jq -c '.deployments | max_by(.timestamp)')
+  newest_ts=$(printf '%s' "$newest" | jq -r '.timestamp')
+  booted_ts=$(printf '%s' "$json" | jq -r '.deployments[] | select(.booted==true) | .timestamp' | head -1)
+  if [[ -n $newest_ts && -n $booted_ts && $newest_ts -gt $booted_ts ]]; then
+    newest_v=$(printf '%s' "$newest" | jq -r '.version // "unknown"')
+    write_state "Reboot to apply staged bootc update ($newest_v)"
+  fi
+
+  # Signal 2: nothing staged locally — poll the registry for a newer image.
+  # container-image-reference is "ostree-image-signed:docker://<ref>"; the
+  # registry ref for skopeo is the docker:// part only.
+  raw_ref="${OMARCHY_IMAGE_REF:-$(printf '%s' "$json" | jq -r '.deployments[] | select(.booted==true) | ."container-image-reference" // empty' | head -1)}"
+  image_ref="${raw_ref#*docker://}"
+  image_ref="docker://${image_ref}"
+  if [[ -z $raw_ref || $image_ref == "docker://" ]]; then
+    write_state "" "Could not determine the booted image reference"
+  fi
+  if ! command -v skopeo >/dev/null 2>&1; then
+    write_state "" "skopeo not available; cannot poll remote image digest"
+  fi
+  if remote_digest=$(timeout "$CHECK_TIMEOUT" skopeo inspect --format '{{.Digest}}' "$image_ref" 2>/dev/null); then
+    if [[ -n $booted_digest && $booted_digest != "$remote_digest" ]]; then
+      write_state "New bootc image available ($remote_digest)"
+    fi
+    # same digest -> current
+    echo "System is up to date"
+    exit 1
+  fi
+  write_state "" "Remote image check failed (offline or registry down)"
+}
+
+# ---------------------------------------------------------------------------
+# MUTABLE — original omedora dnf COPR check (unchanged behavior).
+# ---------------------------------------------------------------------------
+mutable_check() {
+  read -r -a dnf_cmd <<<"${OMEDORA_DNF_CMD:-dnf}"
+  if [[ ${OMEDORA_COPR_REPO_ID+x} == x ]]; then
+    REPO_ID=$OMEDORA_COPR_REPO_ID
+  elif ! REPO_ID=$(omedora-copr --repo-id 2>/dev/null); then
+    REPO_ID=""
+  fi
+
+  local status=0
+  if [[ -z $REPO_ID ]]; then
+    write_state "" "Could not resolve the version-scoped Omedora repository"
+  else
+    timeout "$CHECK_TIMEOUT" "${dnf_cmd[@]}" -q check-upgrade --refresh --repo "$REPO_ID" \
+      >"$tmp_dir/raw" 2>"$tmp_dir/err" || status=$?
+    case "$status" in
+      0|100)
+        list=$(strip_ansi <"$tmp_dir/raw")
+        write_state "$list" ;;
+      124)
+        write_state "" "System package update check timed out" ;;
+      *)
+        err=$(strip_ansi <"$tmp_dir/err" || true)
+        write_state "" "${err:-System package update check failed}" ;;
+    esac
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Distro dispatch entry
+# ---------------------------------------------------------------------------
+if [[ -e /run/ostree-booted ]]; then
+  immutable_check
+else
+  mutable_check
+fi
