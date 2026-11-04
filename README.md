@@ -60,46 +60,7 @@ variant of Omarchy. Highlights:
 - **Flatpak list imported** so all of the favourite apps are installed on first
   boot.
 
-## Variants
-### Desktop (default)
-The standard image with 1080p default, scrolling layout, Omarchy dotfiles, and
-wallpapers imported. Built with:
 
-```sh
-just build-iso
-just build-server-iso
-```
-
-### Server variant (user creation during install)
-A variant where user accounts are provisioned DURING install (in the installer's
-`%post` phase), not on first boot. This is useful for server deployments where
-you want the default user and groups to exist as soon as the machine reboots
-after install.
-
-Built with:
-```sh
-just build-server-iso
-just build-server-qcow2
-```
-
-The server variant kicks off user creation in `%post` (before the `bootc switch`)
-and disables the first-boot `add-default-user-groups.service` so user setup is
-not duplicated on first boot.
-
-## Build
-```sh
-# Build the container image (Podman)
-just build
-
-# Build a bootable disk image (Bootc Image Builder)
-just build-qcow2
-just build-raw
-just build-iso
-just build-server-iso   # Server variant: user creation during install
-
-# Or from the Justfile directly
-just _rebuild-bib localhost/wegweg7979/hurunagus-hyprland latest qcow2 disk_config/disk.toml
-```
 
 ## Install
 
