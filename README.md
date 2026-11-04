@@ -10,13 +10,6 @@ one place, from a single repo. Automatic builds once a week on a Tuesday.
 Dont use this — make your own, it is not too difficult and quite fun.
 https://github.com/ublue-os/image-template
 
-If you didn't listen to the line above and insist on installing from scratch,
-grab the installer ISO:
-
-```text
-https://drive.google.com/file/d/1a5cKI8DIOkMS1URaBouHjLXrVkTheixX/view?usp=sharing
-```
-
 Be aware installed apps and features will be added or removed as I see fit at
 anytime. Hence the warning to not consider this a "stable" OS for anyone except
 myself. It is, in fact, a rock solid, efficient and fully featured operating
@@ -49,7 +42,7 @@ OR: to rebase an existing atomic Fedora installation:
 This image ships **Hyprland** with **Omarchy** dotfiles, based on the omadora
 variant of Omarchy. Highlights:
 
-- **Hyprland** as the window manager (replaces Niri / Dank Material Shell).
+- **Hyprland** as the window manager.
 - **Omarchy** dotfiles under `~/.config/hypr` and `~/.config/omarchy` for the
   look & feel, keybindings and first-boot provisioning.
 - **1080p default** — the desktop starts at 1920×1080 regardless of what the
@@ -67,46 +60,7 @@ variant of Omarchy. Highlights:
 - **Flatpak list imported** so all of the favourite apps are installed on first
   boot.
 
-## Variants
-### Desktop (default)
-The standard image with 1080p default, scrolling layout, Omarchy dotfiles, and
-wallpapers imported. Built with:
 
-```sh
-just build-iso
-just build-server-iso
-```
-
-### Server variant (user creation during install)
-A variant where user accounts are provisioned DURING install (in the installer's
-`%post` phase), not on first boot. This is useful for server deployments where
-you want the default user and groups to exist as soon as the machine reboots
-after install.
-
-Built with:
-```sh
-just build-server-iso
-just build-server-qcow2
-```
-
-The server variant kicks off user creation in `%post` (before the `bootc switch`)
-and disables the first-boot `add-default-user-groups.service` so user setup is
-not duplicated on first boot.
-
-## Build
-```sh
-# Build the container image (Podman)
-just build
-
-# Build a bootable disk image (Bootc Image Builder)
-just build-qcow2
-just build-raw
-just build-iso
-just build-server-iso   # Server variant: user creation during install
-
-# Or from the Justfile directly
-just _rebuild-bib localhost/wegweg7979/hurunagus-hyprland latest qcow2 disk_config/disk.toml
-```
 
 ## Install
 
