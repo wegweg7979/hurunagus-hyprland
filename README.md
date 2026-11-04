@@ -10,13 +10,6 @@ one place, from a single repo. Automatic builds once a week on a Tuesday.
 Dont use this — make your own, it is not too difficult and quite fun.
 https://github.com/ublue-os/image-template
 
-If you didn't listen to the line above and insist on installing from scratch,
-grab the installer ISO:
-
-```text
-https://drive.google.com/file/d/1a5cKI8DIOkMS1URaBouHjLXrVkTheixX/view?usp=sharing
-```
-
 Be aware installed apps and features will be added or removed as I see fit at
 anytime. Hence the warning to not consider this a "stable" OS for anyone except
 myself. It is, in fact, a rock solid, efficient and fully featured operating
