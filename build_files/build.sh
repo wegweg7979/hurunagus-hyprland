@@ -10,7 +10,7 @@ dnf5 install -y dnf5-plugins python3
 echo "::endgroup::"
 
 echo "::group:: Enabling the Omedora COPR"
-dnf5 -y copr enable agaspar/omedora-4
+dnf5 -y copr enable wegweg7979/omedora-4
 # Deliberately left enabled: omedora's package helpers use this repo for
 # updates and for the on-demand apps that are only packaged there.
 echo "::endgroup::"

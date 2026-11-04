@@ -453,3 +453,14 @@ format:
     fi
     # Run shfmt on all Bash scripts
     /usr/bin/find . -iname "*.sh" -type f -exec shfmt --write "{}" ';'
+
+# Re-sync the vendored Omedora resolve files from the fork checkout
+# (omedora-inspect). Keeps output/image packages in lockstep with the fork.
+[group('Omedora')]
+sync-omedora:
+    #!/usr/bin/env bash
+    set -eoux pipefail
+    cp omedora-inspect/install/packages/fedora.toml                     build_files/fedora.toml
+    cp omedora-inspect/install/omarchy-base.packages                    build_files/omarchy-base.packages
+    cp omedora-inspect/omedora/install/fedora-baseline.packages         build_files/fedora-baseline.packages
+    echo "synced Omedora resolve files from omedora-inspect"
