@@ -42,7 +42,7 @@ OR: to rebase an existing atomic Fedora installation:
 This image ships **Hyprland** with **Omarchy** dotfiles, based on the omadora
 variant of Omarchy. Highlights:
 
-- **Hyprland** as the window manager (replaces Niri / Dank Material Shell).
+- **Hyprland** as the window manager.
 - **Omarchy** dotfiles under `~/.config/hypr` and `~/.config/omarchy` for the
   look & feel, keybindings and first-boot provisioning.
 - **1080p default** — the desktop starts at 1920×1080 regardless of what the
