@@ -59,7 +59,6 @@ EXCLUDED_PACKAGES=(
     libreoffice
     xournalpp
     omacut
-    omacalc
     omawrite
     lazydocker
 )
