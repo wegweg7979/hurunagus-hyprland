@@ -70,6 +70,11 @@ jobs:
       # This actually builds the container image
       - name: Build Image
         id: build-image
+        env:
+          # The omedora COPR mutates between image builds of the same git commit,
+          # so a podman layer-cache hit would bake STALE omedora. Force --no-cache
+          # so `dnf install omedora` always re-resolves the COPR.
+          NO_CACHE: "1"
         run: |
           sudo -E $(command -v just) build \
             ${IMAGE_NAME} \
