@@ -82,6 +82,21 @@ variant of Omarchy. Highlights:
   systemctl reboot
   ```
 
+### If you're rebasing from a *different* atomic distro
+
+Your existing `$HOME` is preserved across the rebase — atomic rebases never touch
+it. That means the Omarchy defaults this image ships in `/etc/skel` (dotfiles for
+`~/.config/hypr` and `~/.config/omarchy`, the branding/screensaver files, themes,
+toggles, migration markers) will **not** be seeded into your current user's home.
+To adopt them, run this once **after your first login** on the new system:
+
+```sh
+omarchy-reinstall-configs
+```
+
+New users (fresh installs, or accounts created after the rebase) get these
+automatically from `/etc/skel` and do not need this step.
+
 ## References
 
 - ublue-os image-template: https://github.com/ublue-os/image-template
