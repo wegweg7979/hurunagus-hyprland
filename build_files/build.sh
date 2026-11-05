@@ -121,6 +121,26 @@ fi
 
 echo "::endgroup::"
 
+# cliamp - terminal music player (Winamp-inspired) from GitHub releases.
+# Not in Fedora, not built from source (prebuilt release binary). Ships as a
+# plain executable in /usr/bin; links only glibc + libasound, so alsa-lib is
+# its only runtime dep.
+CLIAMP_URL="https://github.com/bjarneo/cliamp/releases/download/v2.4.0/cliamp-linux-amd64"
+
+echo "::group:: Installing cliamp (terminal music player)"
+if [[ ! -f /tmp/cliamp ]]; then
+    curl -fsSL -o /tmp/cliamp "${CLIAMP_URL}" || \
+        echo "warning: failed to download cliamp binary" >&2
+fi
+
+if [[ -x /tmp/cliamp || -f /tmp/cliamp ]]; then
+    install -Dm0755 /tmp/cliamp /usr/bin/cliamp
+    dnf5 install -y alsa-lib || echo "warning: alsa-lib install failed" >&2
+    rm -f /tmp/cliamp
+    echo "cliamp installed: $(/usr/bin/cliamp version 2>/dev/null || true)"
+fi
+echo "::endgroup::"
+
 install_packages() {
     local failed=() package required_failed=0
 
