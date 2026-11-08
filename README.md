@@ -1,9 +1,9 @@
 # hurunagus-hyprland
 <img width="959" height="540" alt="image" src="https://github.com/user-attachments/assets/1c967de0-b16b-4046-9373-709a73241dbc" />
 
-Declarative, atomic, immutable Linux system. Fedora 44 base, from ublue, with the
-Hyprland + Omarchy desktop (for Hurunagus), automatic weekly updates and all the
-apps I need preinstalled.
+Declarative, atomic, immutable Linux system. Fedora Silverblue, with the
+Hyprland + Omarchy desktop, automatic weekly updates and all the
+apps I need preinstalled. It is fedora, but it is omarchy...
 
 Reason to exist: making all my computers run identical systems, administered in
 one place, from a single repo. Automatic builds once a week on a Tuesday.
@@ -13,12 +13,12 @@ https://github.com/ublue-os/image-template
 
 Be aware installed apps and features will be added or removed as I see fit at
 anytime. Hence the warning to not consider this a "stable" OS for anyone except
-myself. It is, in fact, a rock solid, efficient and fully featured operating
+myself. It is, despite that, a rock solid, efficient and fully featured operating
 system suitable for multimedia and modern computing in 2026. If you are the admin
 for more than one machine, you should really take the time to make your own for
 exactly YOUR needs.
 
-OR: to rebase an existing atomic Fedora installation:
+rebase an existing atomic Fedora installation:
 
 - First rebase to the unsigned image, to get the proper signing keys and policies
   installed:
@@ -46,8 +46,6 @@ variant of Omarchy. Highlights:
 - **Hyprland** as the window manager.
 - **Omarchy** dotfiles under `~/.config/hypr` and `~/.config/omarchy` for the
   look & feel, keybindings and first-boot provisioning.
-- **1080p default** — the desktop starts at 1920×1080 regardless of what the
-  display advertises.
 - **Scrolling window layout** as the default Hyprland layout.
 - **Wallpapers imported** from the original project into
   `~/.local/share/backgrounds` and `/usr/share/backgrounds/hurunagus`.
@@ -59,7 +57,7 @@ variant of Omarchy. Highlights:
   failed-login state. The theme is mirrored into Omarchy's default theme path
   as well, so `omarchy-refresh-sddm` keeps the picker.
 - **Flatpak list imported** so all of the favourite apps are installed on first
-  boot.
+  boot. They will also be re-installed at boot if the user has uninstalled them. 
 
 
 
