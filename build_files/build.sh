@@ -194,6 +194,29 @@ echo "::group:: Copying Hurunagus system files"
 cp -avf /ctx/system_files/. /
 echo "::endgroup::"
 
+# The Hurunagus look-and-feel payload lives in /usr/share/hurunagus/config and is
+# replayed into a live $HOME by omarchy-hurunagus-configs (user-run, never
+# automatic). Seed /etc/skel from that same tree so a brand new user starts with
+# the identical settings -- one source of truth, no second copy to drift.
+echo "::group:: Seeding /etc/skel from the Hurunagus config payload"
+if [[ -d /usr/share/hurunagus/config ]]; then
+    while IFS= read -r -d '' entry; do
+        rel="${entry#/usr/share/hurunagus/config/}"
+        mkdir -p "/etc/skel/${rel%/*}"
+        rm -f "/etc/skel/${rel}"
+        cp -a "${entry}" "/etc/skel/${rel}"
+    done < <(find /usr/share/hurunagus/config -mindepth 1 \( -type f -o -type l \) -print0)
+    chown -R root:root /etc/skel
+    echo "seeded $(find /usr/share/hurunagus/config -mindepth 1 \( -type f -o -type l \) | wc -l) files into /etc/skel"
+else
+    echo "warning: /usr/share/hurunagus/config is missing; /etc/skel not seeded" >&2
+fi
+echo "::endgroup::"
+
+# The reinstall helper is user-run: keep it executable even if a checkout lost
+# the mode bit.
+chmod 0755 /usr/bin/omarchy-hurunagus-configs
+
 # omarchy-plymouth-set --refresh-sddm (and omarchy-refresh-sddm) copies
 # /usr/share/omarchy/default/sddm/omarchy over the live theme. Mirror the
 # Hurunagus theme there so a refresh keeps the user picker and branding.

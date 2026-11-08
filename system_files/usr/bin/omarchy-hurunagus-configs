@@ -1,0 +1,247 @@
+#!/bin/bash
+
+# omarchy:summary=Reload the Hurunagus look and feel (shell, bar, terminals, theme)
+# omarchy:args=[--plan] [--no-theme] [--no-reload]
+# omarchy:examples=omarchy hurunagus configs | omarchy hurunagus configs --plan
+
+# Hurunagus's answer to omarchy-reinstall-configs.
+#
+# omarchy-reinstall-configs replays /etc/skel over $HOME, and /etc/skel is the
+# tree this image ships -- Omarchy's defaults plus the settings Hurunagus
+# deliberately does differently. That makes it an all-or-nothing reset: it also
+# rewrites the Omarchy defaults the user has since tuned themselves.
+#
+# This command replays ONLY the Hurunagus deltas, from the payload baked into
+# the image at /usr/share/hurunagus/config:
+#
+#   .config/omarchy/shell.json                bar at the bottom, transparent,
+#                                             Workspaces plus widget on the left,
+#                                             media in the centre, idle 300/900
+#   .config/omarchy/shell.toml                shell base-size 18, bar height 30
+#   .config/omarchy/plugins/thord.workspaces  the Workspaces plus bar widget
+#   .config/omarchy/branding/screensaver.txt  HURUNAGUS idle screensaver art
+#   .config/omarchy/backgrounds/tokyo-night   the Hurunagus wallpaper set
+#   .config/hypr/looknfeel.lua                scrolling layout, column_width 0.97
+#   .config/foot/foot.ini                     translucent foot (alpha 0.8)
+#
+# Every other file in $HOME -- including the Omarchy defaults you have edited --
+# is left exactly as it is. Monitor layout is deliberately not in the payload:
+# it is the one setting that differs per machine. The generic 1080p rule this
+# image ships stays the untouched /etc/skel default.
+#
+# Per-file policy (the same coexistence contract omedora-seed-config uses):
+#
+#   missing             -> write the Hurunagus file
+#   byte-identical      -> no-op, so re-running is free
+#   exists and differs  -> back up to <path>.pre-hurunagus-<ts>, then write
+#   symlink in payload  -> reproduced as a symlink (never followed); a plain
+#                          file holding the same bytes as the symlink's target
+#                          already counts as unchanged
+#   path with ".."      -> refused
+#
+# Nothing outside $HOME is ever touched, and nothing here is run automatically:
+# this is a command you choose to run, and every file it replaces is recoverable
+# from the backup it prints.
+#
+# Env overrides (mainly for testing):
+#   HURUNAGUS_CONFIGS_DIR  payload tree     (default /usr/share/hurunagus/config)
+#   HURUNAGUS_THEME_CONF   theme+wallpaper  (default /usr/share/hurunagus/theme.conf)
+
+set -euo pipefail
+
+PAYLOAD="${HURUNAGUS_CONFIGS_DIR:-/usr/share/hurunagus/config}"
+THEME_CONF="${HURUNAGUS_THEME_CONF:-/usr/share/hurunagus/theme.conf}"
+
+plan=false
+apply_theme=true
+reload=true
+
+usage() {
+  cat <<'EOF'
+Usage: omarchy-hurunagus-configs [--plan] [--no-theme] [--no-reload]
+
+Reload the Hurunagus-specific desktop settings into $HOME, then re-apply the
+theme and wallpaper from /usr/share/hurunagus/theme.conf.
+
+  --plan       Dry run: print what would be created, backed up, or left alone,
+               and write nothing.
+  --no-theme   Seed the config files only; do not re-apply theme or wallpaper.
+  --no-reload  Do not ask the running shell / Hyprland to reload afterwards.
+
+Existing files that differ are backed up to <path>.pre-hurunagus-<timestamp>.
+EOF
+}
+
+while (($#)); do
+  case "$1" in
+    --plan) plan=true ;;
+    --no-theme) apply_theme=false ;;
+    --no-reload) reload=false ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "${0##*/}: unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
+
+if ((EUID == 0)); then
+  echo "Error: This script should not be run as root" >&2
+  exit 1
+fi
+
+if [[ ! -d $PAYLOAD ]]; then
+  echo "Error: Hurunagus config payload not found at $PAYLOAD" >&2
+  echo "       (is the image intact? expected it from system_files/usr/share/hurunagus/config)" >&2
+  exit 1
+fi
+
+ts="$(date +%s)"
+created=0
+backed_up=0
+unchanged=0
+refused=0
+backed_paths=()
+
+# Classify, then write. A payload symlink is reproduced as a symlink; a regular
+# file always ends up a regular file. rm before cp so a symlink sitting at the
+# destination is replaced rather than written through.
+while IFS= read -r -d '' entry; do
+  rel="${entry#"$PAYLOAD"/}"
+
+  if [[ $rel == *..* ]]; then
+    echo "${0##*/}: refusing suspicious payload path: $rel" >&2
+    refused=$((refused + 1))
+    continue
+  fi
+
+  dst="$HOME/$rel"
+  action=""
+
+  if [[ -L $entry ]]; then
+    if [[ -L $dst ]] && [[ $(readlink "$dst") == "$(readlink "$entry")" ]]; then
+      action=identical
+    elif [[ -e $entry && -f $dst && ! -L $dst ]] && cmp -s "$entry" "$dst"; then
+      # A plain file with the symlink target's exact bytes: already the same
+      # wallpaper, just not a link yet. Leave it alone rather than back it up.
+      action=identical
+    elif [[ -e $dst || -L $dst ]]; then
+      action=backup
+    else
+      action=create
+    fi
+  elif [[ ! -e $dst && ! -L $dst ]]; then
+    action=create
+  elif [[ -f $dst && ! -L $dst ]] && cmp -s "$entry" "$dst"; then
+    action=identical
+  else
+    action=backup
+  fi
+
+  case "$action" in
+    identical)
+      unchanged=$((unchanged + 1))
+      [[ $plan == true ]] && printf 'identical\t%s\n' "$rel"
+      ;;
+    create)
+      created=$((created + 1))
+      if [[ $plan == true ]]; then
+        printf 'create\t%s\n' "$rel"
+      else
+        mkdir -p "$(dirname "$dst")"
+        rm -f "$dst"
+        cp -a "$entry" "$dst"
+      fi
+      ;;
+    backup)
+      backed_up=$((backed_up + 1))
+      backed_paths+=("$rel")
+      if [[ $plan == true ]]; then
+        printf 'backup\t%s\n' "$rel"
+      else
+        mkdir -p "$(dirname "$dst")"
+        cp -a "$dst" "$dst.pre-hurunagus-$ts"
+        rm -f "$dst"
+        cp -a "$entry" "$dst"
+      fi
+      ;;
+  esac
+done < <(find "$PAYLOAD" -mindepth 1 \( -type f -o -type l \) -print0)
+
+if [[ $plan == true ]]; then
+  printf 'omarchy-hurunagus-configs --plan: would create %d, back up %d, leave %d unchanged' \
+    "$created" "$backed_up" "$unchanged" >&2
+  ((refused > 0)) && printf ', refuse %d' "$refused" >&2
+  printf '\n' >&2
+  echo "would then re-apply the theme and wallpaper from $THEME_CONF" >&2
+  exit 0
+fi
+
+echo "Hurunagus configs: wrote $created, backed up $backed_up, unchanged $unchanged"
+if ((${#backed_paths[@]} > 0)); then
+  echo "  previous versions saved as <file>.pre-hurunagus-$ts:"
+  for rel in "${backed_paths[@]}"; do
+    echo "    $rel"
+  done
+fi
+
+# ---------------------------------------------------------------------------
+# Re-apply the theme and wallpaper
+# ---------------------------------------------------------------------------
+theme=""
+background=""
+
+if [[ $apply_theme == true && -f $THEME_CONF ]]; then
+  # shellcheck source=/dev/null
+  source "$THEME_CONF"
+fi
+
+if [[ $apply_theme == true ]]; then
+  if [[ -n ${THEME:-} ]] && command -v omarchy-theme-set >/dev/null 2>&1; then
+    echo "Applying theme: $THEME"
+    omarchy-theme-set "$THEME" || echo "warning: could not apply theme '$THEME'; continuing" >&2
+  fi
+
+  # omarchy-theme-set picks the NEXT wallpaper in the theme directory, so set the
+  # intended one explicitly afterwards to make a re-run land in the same place.
+  if [[ -n ${BACKGROUND:-} ]]; then
+    background_path="$HOME/.config/omarchy/backgrounds/$BACKGROUND"
+    [[ $BACKGROUND == /* ]] && background_path="$BACKGROUND"
+
+    if [[ -f $background_path ]] && command -v omarchy-theme-bg-set >/dev/null 2>&1; then
+      echo "Setting background: ${background_path#"$HOME"/}"
+      omarchy-theme-bg-set "$background_path" || echo "warning: could not set background; continuing" >&2
+    else
+      echo "warning: background not found: $background_path" >&2
+    fi
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Pick the new settings up in the running session
+# ---------------------------------------------------------------------------
+if [[ $reload == true ]]; then
+  # shell.json: ask the running shell to re-read it (never omarchy-refresh-shell,
+  # which would reset shell.json to Omarchy's defaults).
+  if command -v omarchy-shell >/dev/null 2>&1; then
+    if ! omarchy-shell shell reloadConfig >/dev/null 2>&1; then
+      omarchy-shell -q shell rescanPlugins >/dev/null 2>&1 || true
+    fi
+  fi
+
+  # hypr/*.lua: monitors.lua and looknfeel.lua are read at Hyprland config load.
+  if command -v omarchy-restart-hyprctl >/dev/null 2>&1; then
+    omarchy-restart-hyprctl || true
+  elif command -v hyprctl >/dev/null 2>&1; then
+    hyprctl reload >/dev/null 2>&1 || true
+  fi
+fi
+
+echo
+echo "Done. If the bar still shows the old layout, restart the shell: omarchy restart shell"
+echo "foot's translucent background applies to new terminal windows."
