@@ -1,4 +1,5 @@
 # hurunagus-hyprland
+<img width="1918" height="1080" alt="image" src="https://github.com/user-attachments/assets/1c967de0-b16b-4046-9373-709a73241dbc" />
 
 Declarative, atomic, immutable Linux system. Fedora 44 base, from ublue, with the
 Hyprland + Omarchy desktop (for Hurunagus), automatic weekly updates and all the
