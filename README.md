@@ -96,6 +96,9 @@ omarchy-reinstall-configs
 New users (fresh installs, or accounts created after the rebase) get these
 automatically from `/etc/skel` and do not need this step.
 
+<img width="512" height="512" alt="Gemini_Generated_Image_rokat0rokat0roka" src="https://github.com/user-attachments/assets/d0bfbdca-0e15-4e00-a0f9-16cf8704a825" />
+
+
 ## References
 
 - ublue-os image-template: https://github.com/ublue-os/image-template
