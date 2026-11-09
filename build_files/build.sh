@@ -297,6 +297,177 @@ systemctl set-default graphical.target
 echo "::endgroup::"
 
 # ---------------------------------------------------------------------------
+# CachyOS kernel swap
+# ---------------------------------------------------------------------------
+# Ported from hurunagus-silverblue's BlueBuild custom-kernel module
+# (modules/custom-kernel/custom-kernel.sh) -- the proven mechanic for swapping a
+# kernel into an atomic image. Kept in dnf5 form and trimmed to what this image
+# actually needs:
+#
+#   * Secure Boot signing is NOT ported: this image boots with Secure Boot
+#     disabled, so sbsign/sign-file/MOK enrollment would be dead weight. The
+#     kernel is therefore UNSIGNED -- enrolling a MOK is a prerequisite if
+#     Secure Boot is ever switched on.
+#   * The NVIDIA/akmods half is NOT ported: this image targets Intel iGPUs and
+#     installs no out-of-tree kernel modules. -devel-matched is still installed
+#     so that stays possible later.
+#   * An initramfs IS generated, and that part is not optional here: the base
+#     image bakes /usr/lib/modules/$kver/initramfs.img and 50-dracut.install is
+#     stubbed during the swap, so nothing else would produce one for the new
+#     kernel -- a kernel without an initramfs cannot boot.
+#
+# Kernel source: bieszczaders/kernel-cachyos, the official CachyOS port to
+# Fedora. It carries the CachyOS patch set (BORE CPU scheduler, 1000 Hz tick,
+# PREEMPT_DYNAMIC, BFQ/Kyber, BBR, x86_64-v3). kernel-cachyos is the GCC build;
+# kernel-cachyos-lto is its clang/ThinLTO twin with an otherwise identical
+# config (vmlinuz ~3% smaller), so switching between them is the one-line
+# KERNEL_FLAVOR below.
+echo "::group:: Swapping in the CachyOS kernel"
+
+KERNEL_FLAVOR="cachyos"
+
+case "${KERNEL_FLAVOR}" in
+    cachyos)
+        KERNEL_COPR="bieszczaders/kernel-cachyos"
+        KERNEL_PACKAGES=(
+            kernel-cachyos
+            kernel-cachyos-core
+            kernel-cachyos-modules
+            kernel-cachyos-devel-matched
+        )
+        ;;
+    cachyos-lto)
+        KERNEL_COPR="bieszczaders/kernel-cachyos-lto"
+        KERNEL_PACKAGES=(
+            kernel-cachyos-lto
+            kernel-cachyos-lto-core
+            kernel-cachyos-lto-modules
+            kernel-cachyos-lto-devel-matched
+        )
+        ;;
+    cachyos-lts)
+        KERNEL_COPR="bieszczaders/kernel-cachyos"
+        KERNEL_PACKAGES=(
+            kernel-cachyos-lts
+            kernel-cachyos-lts-core
+            kernel-cachyos-lts-modules
+            kernel-cachyos-lts-devel-matched
+        )
+        ;;
+    cachyos-lts-lto)
+        KERNEL_COPR="bieszczaders/kernel-cachyos-lto"
+        KERNEL_PACKAGES=(
+            kernel-cachyos-lts-lto
+            kernel-cachyos-lts-lto-core
+            kernel-cachyos-lts-lto-modules
+            kernel-cachyos-lts-lto-devel-matched
+        )
+        ;;
+    cachyos-rt)
+        KERNEL_COPR="bieszczaders/kernel-cachyos"
+        KERNEL_PACKAGES=(
+            kernel-cachyos-rt
+            kernel-cachyos-rt-core
+            kernel-cachyos-rt-modules
+            kernel-cachyos-rt-devel-matched
+        )
+        ;;
+    *)
+        echo "Unsupported KERNEL_FLAVOR: ${KERNEL_FLAVOR}" >&2
+        exit 1
+        ;;
+esac
+
+# The kernel's %posttrans guards `kernel-install add` behind
+# `[ ! -e /run/ostree-booted ]`. Inside a container build that path does not
+# exist, so the kernel-install hooks really do run: 05-rpmostree.install would
+# try to drive rpm-ostree, and 50-dracut.install would build an initramfs with
+# flags we do not control. Stub both for the duration of the swap, restore after.
+KERNEL_HOOKS=(
+    /usr/lib/kernel/install.d/05-rpmostree.install
+    /usr/lib/kernel/install.d/50-dracut.install
+)
+
+disable_kernel_install_hooks() {
+    local hook
+    for hook in "${KERNEL_HOOKS[@]}"; do
+        [[ -f "${hook}" ]] || continue
+        mv "${hook}" "${hook}.bak"
+        printf '%s\n' '#!/bin/sh' 'exit 0' >"${hook}"
+        chmod +x "${hook}"
+    done
+}
+
+restore_kernel_install_hooks() {
+    local hook
+    for hook in "${KERNEL_HOOKS[@]}"; do
+        if [[ -f "${hook}.bak" ]]; then
+            mv -f "${hook}.bak" "${hook}"
+        fi
+    done
+}
+
+disable_kernel_install_hooks
+
+echo "Removing the stock Fedora kernel"
+dnf5 remove -y \
+    kernel \
+    kernel-core \
+    kernel-modules \
+    kernel-modules-core \
+    kernel-modules-extra \
+    kernel-devel \
+    kernel-devel-matched || true
+rm -rf /usr/lib/modules/* || true
+
+echo "Enabling ${KERNEL_COPR}"
+dnf5 -y copr enable "${KERNEL_COPR}"
+
+echo "Installing ${KERNEL_PACKAGES[*]}"
+# Deliberately strict: with the stock kernel already removed, a failure here
+# would leave the image with no kernel at all, so abort rather than ship one
+# that cannot boot.
+dnf5 install -y "${KERNEL_PACKAGES[@]}"
+
+mapfile -t KERNEL_VERSIONS < <(find /usr/lib/modules -mindepth 1 -maxdepth 1 -type d -printf '%f\n')
+if (( ${#KERNEL_VERSIONS[@]} != 1 )); then
+    printf 'Expected exactly one kernel in /usr/lib/modules, found %d: %s\n' \
+        "${#KERNEL_VERSIONS[@]}" "${KERNEL_VERSIONS[*]}" >&2
+    exit 1
+fi
+KERNEL_VERSION="${KERNEL_VERSIONS[0]}"
+echo "Kernel version: ${KERNEL_VERSION}"
+
+restore_kernel_install_hooks
+
+# Only the CachyOS repo is dropped. The omedora COPR is deliberately left
+# enabled above -- omedora's helpers use it -- so never wildcard this pattern.
+rm -f /etc/yum.repos.d/_copr:copr.fedorainfracloud.org:bieszczaders:*.repo
+
+echo "Generating the initramfs for ${KERNEL_VERSION}"
+# Match how the base image's own initramfs is built: the image sets hostonly=no
+# (20-atomic-nohostonly.conf) and adds the ostree+bootc dracut modules
+# (20-atomic-bootc-ostree.conf), so those come from config; the explicit flags
+# below are belt-and-braces.
+DRACUT_NO_XATTR=1 dracut \
+    --no-hostonly \
+    --kver "${KERNEL_VERSION}" \
+    --reproducible \
+    --add ostree \
+    -f "/usr/lib/modules/${KERNEL_VERSION}/initramfs.img"
+
+# dracut writes this file outside any RPM transaction, so no scriptlet labels
+# it. The base image's own initramfs is mode 0600; match it and relabel when
+# policy is available in the build container.
+chmod 0600 "/usr/lib/modules/${KERNEL_VERSION}/initramfs.img"
+if command -v restorecon >/dev/null 2>&1; then
+    restorecon "/usr/lib/modules/${KERNEL_VERSION}/initramfs.img" 2>/dev/null || true
+fi
+
+echo "CachyOS kernel ${KERNEL_VERSION} installed"
+echo "::endgroup::"
+
+# ---------------------------------------------------------------------------
 # Clean build artifacts so they don't ship in the image
 # ---------------------------------------------------------------------------
 echo "::group:: Cleaning up"

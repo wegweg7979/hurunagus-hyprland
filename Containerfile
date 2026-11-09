@@ -13,6 +13,11 @@ FROM ghcr.io/ublue-os/base-main:latest
 # fedora-45-x86_64 only. base-main:latest currently tracks Fedora 45 (the
 # 2026-11-08 build shipped kernel 7.2.15-300.fc45); pin a date tag here if you
 # need a reproducible build.
+#
+# The kernel is NOT the base image's stock Fedora kernel: build.sh swaps in
+# kernel-cachyos (BORE scheduler, 1000 Hz, x86_64-v3) from the bieszczaders
+# COPR, so the baked kernel version moves on every build. It is unsigned --
+# enabling Secure Boot requires enrolling a MOK yourself.
 
 ### [IM]MUTABLE /opt
 ## Fedora's base image symlinks /opt -> /var/opt. RPMs such as brave-origin

@@ -67,6 +67,16 @@ variant of Omarchy. Highlights:
   `discard=async`), and the package's default `MOUNTPOINTS="/"` is overridden
   because `/` on this image is a composefs/overlay mount, not btrfs — the default
   would make the job skip every filesystem while appearing to succeed.
+- **CachyOS kernel** — the stock Fedora kernel is replaced at build time with
+  `kernel-cachyos` from the official CachyOS Fedora port: BORE CPU scheduler,
+  1000 Hz tick, full preemption, BFQ/Kyber I/O schedulers, x86_64-v3. A matching
+  initramfs is generated for it. The kernel is unsigned, so Secure Boot would
+  need a MOK enrolled by hand.
+- **Plymouth boot splash** — the stock `spinner` theme is selected (instead of
+  the `bgrt` default, which only shows the firmware logo) and its watermark is
+  replaced with the Hurunagus artwork, so the splash shows the distro logo above
+  the spinner. Selection lives in `/etc/plymouth/plymouthd.conf`, artwork in
+  `system_files/usr/share/plymouth/themes/spinner/watermark.png`.
 
 
 
