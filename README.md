@@ -6,7 +6,7 @@ Hyprland + Omarchy desktop, automatic weekly updates and all the
 apps I need preinstalled. It is fedora, but it is omarchy...
 
 Reason to exist: making all my computers run identical systems, administered in
-one place, from a single repo. Automatic builds once a week on a Tuesday.
+one place, from a single repo. Automatic builds once a week on a Tuesday, silently applied in the background and applied on reboot.
 Stability of Fedora. Immutability and build process of Silverblue. Omarchy bling. CachyOs performance. Batteries included from Universal Blue.
 The best of Linux in one distro. 
 
