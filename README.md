@@ -2,8 +2,8 @@
 <img width="959" height="540" alt="image" src="https://github.com/user-attachments/assets/1c967de0-b16b-4046-9373-709a73241dbc" />
 
 Declarative, atomic, immutable Linux system. Fedora Silverblue, with
-Hyprland + Omarchy desktop, automatic weekly updates and all the
-apps I need preinstalled. It is fedora, but it is omarchy...
+Hyprland + Omarchy desktop, Cachyos kernel , automatic weekly updates and all the
+apps I need preinstalled. It is fedora, but it is omarchy, but its Cachyos....
 
 Reason to exist: making all my computers run identical systems, administered in
 one place, from a single repo. Automatic builds once a week on a Tuesday, silently applied in the background and applied on reboot.
