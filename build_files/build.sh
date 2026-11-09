@@ -409,6 +409,16 @@ restore_kernel_install_hooks() {
 
 disable_kernel_install_hooks
 
+# Because kernel-install runs during the transaction below (see the note above),
+# it writes boot artifacts into /boot: /boot/vmlinuz-*, config-*, System.map-*
+# and symvers-*.zst (hardlinks to the module dir) plus a /boot/loader/ dir. The
+# base image's /boot is deliberately empty and bootc manages /boot on the
+# deployed host, so snapshot /boot here and delete only what appears. Snapshot
+# rather than hardcoding paths, so a future base image that ships something in
+# /boot is not clobbered.
+KERNEL_BOOT_SNAPSHOT="$(mktemp)"
+find /boot -mindepth 1 -maxdepth 1 -printf '%f\n' | sort >"${KERNEL_BOOT_SNAPSHOT}"
+
 echo "Removing the stock Fedora kernel"
 dnf5 remove -y \
     kernel \
@@ -440,6 +450,23 @@ echo "Kernel version: ${KERNEL_VERSION}"
 
 restore_kernel_install_hooks
 
+# Undo the /boot pollution described above, keeping only what was there before
+# the swap. Without this the image ships stale /boot content and bootc's
+# nonempty-boot lint flips from pass to warning (verified: 12 passed/2 warnings
+# becomes 11 passed/3 warnings).
+NEW_BOOT_ENTRIES=()
+while IFS= read -r boot_entry; do
+    [[ -n "${boot_entry}" ]] || continue
+    NEW_BOOT_ENTRIES+=("${boot_entry}")
+done < <(comm -13 "${KERNEL_BOOT_SNAPSHOT}" <(find /boot -mindepth 1 -maxdepth 1 -printf '%f\n' | sort))
+rm -f "${KERNEL_BOOT_SNAPSHOT}"
+if (( ${#NEW_BOOT_ENTRIES[@]} )); then
+    echo "Removing ${#NEW_BOOT_ENTRIES[@]} /boot entries left by the kernel transaction: ${NEW_BOOT_ENTRIES[*]}"
+    for boot_entry in "${NEW_BOOT_ENTRIES[@]}"; do
+        rm -rf -- "/boot/${boot_entry}"
+    done
+fi
+
 # Only the CachyOS repo is dropped. The omedora COPR is deliberately left
 # enabled above -- omedora's helpers use it -- so never wildcard this pattern.
 rm -f /etc/yum.repos.d/_copr:copr.fedorainfracloud.org:bieszczaders:*.repo
@@ -464,6 +491,21 @@ if command -v restorecon >/dev/null 2>&1; then
     restorecon "/usr/lib/modules/${KERNEL_VERSION}/initramfs.img" 2>/dev/null || true
 fi
 
+# Assert the initramfs really exists and is plausibly sized. `set -e` already
+# catches a non-zero dracut, but dracut can log a failure and still exit 0 (it
+# prints "dracut-install: ERROR: installing '/root' to '/root'" on this image
+# because /root is a symlink to var/roothome with no target in the build
+# container -- harmless, and the stock initramfs omits /root too). A kernel with
+# no usable initramfs cannot boot, so never let that through silently.
+INITRAMFS_MIN_BYTES=$((100 * 1024 * 1024))
+INITRAMFS_SIZE="$(stat -c %s "/usr/lib/modules/${KERNEL_VERSION}/initramfs.img" 2>/dev/null || echo 0)"
+if (( INITRAMFS_SIZE < INITRAMFS_MIN_BYTES )); then
+    printf 'initramfs for %s is missing or implausibly small (%s bytes, expected >%s); refusing to ship a likely-unbootable image\n' \
+        "${KERNEL_VERSION}" "${INITRAMFS_SIZE}" "${INITRAMFS_MIN_BYTES}" >&2
+    exit 1
+fi
+echo "initramfs verified: ${INITRAMFS_SIZE} bytes"
+
 echo "CachyOS kernel ${KERNEL_VERSION} installed"
 echo "::endgroup::"
 
@@ -478,6 +520,7 @@ rm -rf \
     /run/tuned \
     /var/lib/dnf \
     /var/lib/fprint \
+    /var/lib/rpm-state \
     /var/cache/libdnf5 \
     /var/log/dnf.log \
     /var/log/dnf.librepo.log \
