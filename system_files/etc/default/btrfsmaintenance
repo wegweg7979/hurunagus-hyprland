@@ -1,0 +1,36 @@
+# Hurunagus Hyprland overrides for btrfsmaintenance.
+#
+# btrfsmaintenance sources /etc/sysconfig/btrfsmaintenance first and this file
+# second, so anything set here wins. The RPM owns only the /etc/sysconfig file;
+# this one is shipped by the image, so the package's %config file stays pristine
+# and never collides with ours on update.
+#
+# Why each override exists:
+#
+#   * MOUNTPOINTS: the package points every job at "/", but on this image "/" is
+#     a composefs/overlay mount (stat -f --format=%T / -> overlayfs). The job
+#     scripts would print "Path / is not btrfs, skipping" and exit 0 -- silently
+#     doing nothing. "auto" instead resolves one mountpoint per btrfs *device*,
+#     which collapses the four mounts of nvme0n1p3 (/etc, /var, /var/home,
+#     /sysroot) into a single scrub pass instead of four over the same blocks.
+#   * Scrub: monthly, idle priority, repairs allowed. Metadata has a DUP copy to
+#     repair from; data is single-profile, so data corruption can only be
+#     detected. Measured cost on this hardware: ~1 min 36 s for 284 GiB.
+#   * Balance/defrag: off. Allocation is healthy (428 GiB of 951 GiB allocated,
+#     523 GiB unallocated) and a filtered balance on a filesystem mounted four
+#     times buys nothing. Defrag re-COWs everything for no gain here.
+#   * Trim: off. fstrim.timer (weekly) and the discard=async mount option already
+#     cover it; a third pass would only duplicate work.
+#   * LOG_OUTPUT=journal logs via systemd-cat -t btrfs-scrub, so runs are
+#     identifiable with `journalctl -t btrfs-scrub`.
+
+BTRFS_SCRUB_MOUNTPOINTS="auto"
+BTRFS_SCRUB_PERIOD="monthly"
+BTRFS_SCRUB_PRIORITY="idle"
+BTRFS_SCRUB_READ_ONLY="false"
+
+BTRFS_BALANCE_PERIOD="none"
+BTRFS_DEFRAG_PERIOD="none"
+BTRFS_TRIM_PERIOD="none"
+
+BTRFS_LOG_OUTPUT="journal"

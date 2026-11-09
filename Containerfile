@@ -10,8 +10,9 @@ FROM ghcr.io/ublue-os/base-main:latest
 # FROM ghcr.io/ublue-os/aurora:stable
 #
 # The Omedora COPR we install from publishes fedora-44-x86_64 and
-# fedora-45-x86_64 only. base-main:latest is Fedora 44 at the time of writing;
-# pin a date tag here if you need a reproducible build.
+# fedora-45-x86_64 only. base-main:latest currently tracks Fedora 45 (the
+# 2026-11-08 build shipped kernel 7.2.15-300.fc45); pin a date tag here if you
+# need a reproducible build.
 
 ### [IM]MUTABLE /opt
 ## Fedora's base image symlinks /opt -> /var/opt. RPMs such as brave-origin

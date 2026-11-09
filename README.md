@@ -60,6 +60,13 @@ variant of Omarchy. Highlights:
   as well, so `omarchy-refresh-sddm` keeps the picker.
 - **Flatpak list imported** so all of the favourite apps are installed on first
   boot. They will also be re-installed at boot if the user has uninstalled them. 
+- **Btrfs maintenance** via `btrfsmaintenance`: a monthly checksum-verifying
+  scrub of the btrfs filesystem (`btrfs-scrub.timer`), tuned by
+  `/etc/default/btrfsmaintenance`. The package's balance, defrag and trim timers
+  are deliberately off (trim is already covered by `fstrim.timer` plus
+  `discard=async`), and the package's default `MOUNTPOINTS="/"` is overridden
+  because `/` on this image is a composefs/overlay mount, not btrfs — the default
+  would make the job skip every filesystem while appearing to succeed.
 
 
 

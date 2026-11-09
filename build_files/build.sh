@@ -90,8 +90,15 @@ EXTRA_PACKAGES=(
     igt-gpu-tools
     lm_sensors
     fprintd
+    # PAM module for the fingerprint reader. fprintd alone leaves
+    # /usr/lib64/security/pam_fprintd.so unloadable, which logs a dlopen failure
+    # on every sudo/PAM authentication.
+    fprintd-pam
     kf6-kimageformats
     libatomic
+    # Btrfs maintenance timers (monthly scrub). Tuned by
+    # /etc/default/btrfsmaintenance, which this image ships.
+    btrfsmaintenance
 )
 
 # Brave browser repo
@@ -268,6 +275,23 @@ enable_unit docker.socket
 # Units shipped by this image: these must be enabled.
 systemctl enable flatpak-system-install.service
 systemctl enable add-default-user-groups.service
+
+# Btrfs maintenance: scrub only. Periods come from
+# /etc/default/btrfsmaintenance (shipped in system_files/); balance, defrag and
+# trim stay off and are disabled explicitly here in case a future preset turns
+# them on (fstrim.timer plus discard=async already handle trim).
+enable_unit btrfs-scrub.timer
+enable_unit btrfsmaintenance-refresh.path
+systemctl disable btrfs-balance.timer btrfs-trim.timer btrfs-defrag.timer >/dev/null 2>&1 || true
+
+# Bake the timer schedule drop-in (OnCalendar=<period>) into the image so first
+# boot does not depend on a runtime refresh. The refresh script's own systemctl
+# enable/start calls are no-ops inside the build container, which is why the
+# enable_unit calls above are required.
+if [[ -x /usr/share/btrfsmaintenance/btrfsmaintenance-refresh-cron.sh ]]; then
+    /usr/share/btrfsmaintenance/btrfsmaintenance-refresh-cron.sh systemd-timer >/dev/null 2>&1 ||
+        echo "warning: btrfsmaintenance refresh failed; scrub schedule may be missing" >&2
+fi
 
 systemctl set-default graphical.target
 echo "::endgroup::"
