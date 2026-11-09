@@ -52,12 +52,7 @@ variant of Omarchy. Highlights:
 - **Wallpapers imported** from the original project into
   `~/.local/share/backgrounds` and `/usr/share/backgrounds/hurunagus`.
 - **SDDM user picker** — the Omarchy login theme lists every human account
-  instead of assuming a single last user. It still remembers the last login
-  when `/var/lib/sddm/state.conf` exists, and falls back to the first account
-  on a fresh install or rebase. Click a name, or use Up/Down while the
-  password field is focused. Switching accounts clears the password and any
-  failed-login state. The theme is mirrored into Omarchy's default theme path
-  as well, so `omarchy-refresh-sddm` keeps the picker.
+  instead of assuming a single user.
 - **Flatpak list imported** so all of the favourite apps are installed on first
   boot. They will also be re-installed at boot if the user has uninstalled them. 
 - **Btrfs maintenance** via `btrfsmaintenance`: a monthly checksum-verifying
@@ -72,11 +67,6 @@ variant of Omarchy. Highlights:
   1000 Hz tick, full preemption, BFQ/Kyber I/O schedulers, x86_64-v3. A matching
   initramfs is generated for it. The kernel is unsigned, so Secure Boot would
   need a MOK enrolled by hand.
-- **Plymouth boot splash** — the stock `spinner` theme is selected (instead of
-  the `bgrt` default, which only shows the firmware logo) and its watermark is
-  replaced with the Hurunagus artwork, so the splash shows the distro logo above
-  the spinner. Selection lives in `/etc/plymouth/plymouthd.conf`, artwork in
-  `system_files/usr/share/plymouth/themes/spinner/watermark.png`.
 
 
 
