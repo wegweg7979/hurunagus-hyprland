@@ -48,7 +48,7 @@ variant of Omarchy. Highlights:
 - **Hyprland** as the window manager.
 - **Omarchy** dotfiles under `~/.config/hypr` and `~/.config/omarchy` for the
   look & feel, keybindings and first-boot provisioning.
-  **Omedora** forked and modified to function correctly on immutable fedora (rpm-ostree / bootc).
+- **Omedora** forked and modified to function correctly on immutable fedora (rpm-ostree / bootc).
 - **Scrolling window layout** as the default Hyprland layout.
 - **Wallpapers imported** from the original project into
   `~/.local/share/backgrounds` and `/usr/share/backgrounds/hurunagus`.
