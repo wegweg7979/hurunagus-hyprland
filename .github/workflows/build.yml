@@ -13,6 +13,15 @@ on:
     paths-ignore:
       - '**/README.md'
   workflow_dispatch:
+    inputs:
+      fresh:
+        description: "Rebuild every layer and re-resolve the CachyOS kernel (ignores the layer cache)"
+        type: boolean
+        default: false
+      rechunk:
+        description: "Also split the image for smaller delta updates (adds ~10 minutes)"
+        type: boolean
+        default: false
 
 env:
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"  # do not edit
@@ -72,9 +81,15 @@ jobs:
         id: build-image
         env:
           # The omedora COPR mutates between image builds of the same git commit,
-          # so a podman layer-cache hit would bake STALE omedora. Force --no-cache
-          # so `dnf install omedora` always re-resolves the COPR.
-          NO_CACHE: "1"
+          # so the Omedora payload must always be re-resolved -- but that alone
+          # used to cost a full --no-cache rebuild. The Containerfile is split
+          # into a stable base layer, a kernel layer and a volatile tail, so bust
+          # just the tail on every build. A scheduled or "fresh" run also sets
+          # ALL_BUST/KERNEL_BUST, which is exactly the old --no-cache behaviour.
+          EXTRA_BUILD_ARGS: "--build-arg OMEDORA_BUST=${{ github.run_id }}${{ (github.event_name == 'schedule' || inputs.fresh) && format(' --build-arg ALL_BUST={0} --build-arg KERNEL_BUST={0}', github.run_id) || '' }}"
+          # Registry layer cache when the runner's podman supports it (5.x+);
+          # otherwise podman keeps its local-only cache and this is ignored.
+          BUILD_CACHE_REF: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
         run: |
           sudo -E $(command -v just) build \
             ${IMAGE_NAME} \
@@ -83,6 +98,10 @@ jobs:
       # This is optional, this provides smaller delta updates
       - name: Rechunk with rpm-ostree
         id: rechunk
+        # ~10 minutes of the run, spent purely on smaller client-side deltas.
+        # Pay for it on the weekly scheduled build (what people actually update
+        # from) and on explicit request; a push-driven dev build skips it.
+        if: github.event_name == 'schedule' || inputs.rechunk
         run: |
           sudo -E $(command -v just) ostree-rechunk \
             ${IMAGE_NAME} \

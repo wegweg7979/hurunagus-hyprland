@@ -123,6 +123,25 @@ build $target_image=image_name $tag=default_tag:
 
     # This actually builds the image!
     PODMAN_BUILD_ARGS=("${BUILD_ARGS[@]}" "${LABELS[@]}" --pull=newer --tag "${target_image}:${tag}" --file Containerfile)
+    # Cache-busting inputs from CI (see "CACHE-BUSTING INPUTS" in the
+    # Containerfile). Space-separated, e.g.
+    #   EXTRA_BUILD_ARGS='--build-arg OMEDORA_BUST=12345'
+    if [[ -n "${EXTRA_BUILD_ARGS:-}" ]]; then
+        read -ra extra_build_args <<< "${EXTRA_BUILD_ARGS}"
+        PODMAN_BUILD_ARGS+=("${extra_build_args[@]}")
+    fi
+    # Registry-backed layer cache, used when this podman knows the flags
+    # (5.x+). Set BUILD_CACHE_REF to a writable ref, e.g.
+    #   BUILD_CACHE_REF=ghcr.io/owner/image:buildcache
+    # Older podman (the 4.9 on GitHub's ubuntu-24.04 runners) silently keeps
+    # its local-only layer cache instead.
+    if [[ -n "${BUILD_CACHE_REF:-}" ]] && podman build --help 2>/dev/null | grep -q -- '--cache-to'; then
+        PODMAN_BUILD_ARGS+=(
+            --cache-from "${BUILD_CACHE_REF}"
+            --cache-to "${BUILD_CACHE_REF}"
+            --cache-ttl 336h
+        )
+    fi
     if [[ "${NO_CACHE:-0}" == "1" ]]; then
         PODMAN_BUILD_ARGS+=("--no-cache")
     fi
