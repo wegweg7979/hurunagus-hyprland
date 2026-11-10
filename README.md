@@ -49,20 +49,14 @@ variant of Omarchy. Highlights:
 - **Omarchy** dotfiles under `~/.config/hypr` and `~/.config/omarchy` for the
   look & feel, keybindings and first-boot provisioning.
 - **Omedora** forked and modified to function correctly on immutable fedora (rpm-ostree / bootc).
-- **Scrolling window layout** as the default Hyprland layout.
+- **Scrolling window layout** as the default Hyprland layout. (niri like)
 - **Wallpapers imported** from the original project into
   `~/.local/share/backgrounds` and `/usr/share/backgrounds/hurunagus`.
-- **SDDM user picker** — the Omarchy login theme lists every human account
-  instead of assuming a single user.
+- **SDDM user picker** — the Omarchy login theme with added user picker for multi-user systems.
 - **Flatpak list imported** so all of the favourite apps are installed on first
   boot. They will also be re-installed at boot if the user has uninstalled them. 
 - **Btrfs maintenance** via `btrfsmaintenance`: a monthly checksum-verifying
-  scrub of the btrfs filesystem (`btrfs-scrub.timer`), tuned by
-  `/etc/default/btrfsmaintenance`. The package's balance, defrag and trim timers
-  are deliberately off (trim is already covered by `fstrim.timer` plus
-  `discard=async`), and the package's default `MOUNTPOINTS="/"` is overridden
-  because `/` on this image is a composefs/overlay mount, not btrfs — the default
-  would make the job skip every filesystem while appearing to succeed.
+  scrub of the btrfs filesystem.
 - **CachyOS kernel** — the stock Fedora kernel is replaced at build time with
   `kernel-cachyos` from the official CachyOS Fedora port: BORE CPU scheduler,
   1000 Hz tick, full preemption, BFQ/Kyber I/O schedulers, x86_64-v3. A matching
