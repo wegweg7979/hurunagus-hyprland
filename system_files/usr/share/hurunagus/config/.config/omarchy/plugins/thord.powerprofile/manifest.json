@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "thord.powerprofile",
+  "name": "Power profile",
+  "version": "1.0.0",
+  "author": "thord",
+  "license": "MIT",
+  "description": "CPU power-profile picker on the bar, with or without a battery. Complements omarchy.power, which hides itself on machines that report no battery.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "PowerProfile.qml"
+  },
+  "barWidget": {
+    "displayName": "Power profile",
+    "description": "Active CPU power profile with a popup picker: performance, balanced, power saver",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "showLabel": false
+    },
+    "schema": [
+      { "key": "showLabel", "type": "boolean", "label": "Show the profile name beside the icon" }
+    ]
+  }
+}
