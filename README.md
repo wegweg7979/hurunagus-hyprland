@@ -20,7 +20,8 @@ system suitable for multimedia and modern computing in 2026. I need my computer 
 for more than one machine, you should really take the time to make your own for
 exactly YOUR needs.
 
-rebase an existing atomic Fedora installation:
+rebase an existing atomic Fedora installation — the safe, scripted path is
+[`hurubase`](#install), and these are the same steps by hand:
 
 - First rebase to the unsigned image, to get the proper signing keys and policies
   installed:
@@ -67,6 +68,21 @@ variant of Omarchy. Highlights:
 
 ## Install
 
+The safe way in is [`hurubase`](https://github.com/wegweg7979/hurunagus-rebase).
+It resolves and digest-pins the address, reads your container signature policy to
+decide whether the signed image works directly or the two-step below is needed,
+refuses a staged deployment / low disk / an address that will not resolve, and
+after the reboot adopts this image's `/etc/skel` payload into your `$HOME` and
+fixes a session record that still points at the old desktop — asking before each
+change.
+
+```sh
+./hurubase ghcr.io/wegweg7979/hurunagus-hyprland:latest        # preflight and plan
+sudo ./hurubase ghcr.io/wegweg7979/hurunagus-hyprland:latest   # apply
+```
+
+If you prefer to do it yourself, `hurubase` does exactly this:
+
 - First rebase to the unsigned image, to get the proper signing keys and policies
   installed:
   ```sh
@@ -100,6 +116,12 @@ omarchy-reinstall-configs
 New users (fresh installs, or accounts created after the rebase) get these
 automatically from `/etc/skel` and do not need this step.
 
+Re-running [`hurubase`](https://github.com/wegweg7979/hurunagus-rebase) with the
+same image address does this adoption for you, along with resetting a session
+record that still names the other distro's session (which is what leaves you on a
+black screen or bouncing back to the greeter) — each change offered separately,
+with backups.
+
 <img width="512" height="512" alt="Gemini_Generated_Image_rokat0rokat0roka" src="https://github.com/user-attachments/assets/d0bfbdca-0e15-4e00-a0f9-16cf8704a825" />
 
 
@@ -109,3 +131,4 @@ automatically from `/etc/skel` and do not need this step.
 - Omarchy: https://github.com/omacom/omarchy
 - Omedora (omeadora): https://github.com/AndrewGaspar/omadora
 - Original Hurunagus ublue project: https://github.com/wegweg7979/hurunagus-ublue
+- hurubase — safe rebase helper: https://github.com/wegweg7979/hurunagus-rebase
