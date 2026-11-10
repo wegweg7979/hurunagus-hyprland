@@ -1,7 +1,20 @@
 #!/bin/bash
 
+# Build phases, split so the container build can cache the expensive, stable
+# work and keep only the volatile tail fresh on every build. The Containerfile
+# runs each phase as its own layer; `just build` on a workstation runs them all
+# in one go, which is the behaviour this script has always had.
+#
+#   base    repos, the whole package install, system files, services  (cacheable)
+#   kernel  the CachyOS kernel swap and its initramfs                 (weekly)
+#   fresh   re-resolve the Omedora payload, re-mirror its SDDM theme,
+#           clean build artifacts                                    (every build)
+#   all     every phase in order (default)
+PHASE="${1:-all}"
+
 set -ouex pipefail
 
+phase_base() {
 # ---------------------------------------------------------------------------
 # Build tooling + the Omedora COPR
 # ---------------------------------------------------------------------------
@@ -295,7 +308,9 @@ fi
 
 systemctl set-default graphical.target
 echo "::endgroup::"
+}
 
+phase_kernel() {
 # ---------------------------------------------------------------------------
 # CachyOS kernel swap
 # ---------------------------------------------------------------------------
@@ -508,6 +523,38 @@ echo "initramfs verified: ${INITRAMFS_SIZE} bytes"
 
 echo "CachyOS kernel ${KERNEL_VERSION} installed"
 echo "::endgroup::"
+}
+
+phase_fresh() {
+# ---------------------------------------------------------------------------
+# Volatile tail: the Omedora COPR mutates between builds of the same commit
+# ---------------------------------------------------------------------------
+# `dnf5 install omedora` above is a no-op whenever the base layer is a cache
+# hit, which would silently freeze the payload at whatever the COPR served the
+# first time. This phase is invalidated on every build (OMEDORA_BUST), so it is
+# where the payload is re-resolved: cheap next to the full package transaction
+# it replaces, and always current. Every other package follows the weekly
+# scheduled rebuild, which passes ALL_BUST and rebuilds from scratch.
+echo "::group:: Refreshing the Omarchy runtime (Omedora)"
+dnf5 -y --refresh upgrade omedora omedora-settings || \
+    echo "warning: omedora refresh failed; shipping the version baked into the cached layer" >&2
+echo "::endgroup::"
+
+# The cached base layer mirrored the SDDM theme from whatever omedora was
+# installed then. Redo it here in case the refresh replaced the packaged theme.
+echo "::group:: Re-mirroring the Hurunagus SDDM theme into Omarchy's defaults"
+if [[ -d /usr/share/sddm/themes/omarchy ]]; then
+    mkdir -p /usr/share/omarchy/default/sddm
+    rm -rf /usr/share/omarchy/default/sddm/omarchy
+    chown -R root:root /usr/share/sddm/themes/omarchy
+    chmod -R go-w /usr/share/sddm/themes/omarchy
+    cp -a /usr/share/sddm/themes/omarchy /usr/share/omarchy/default/sddm/omarchy
+    chown -R root:root /usr/share/omarchy/default/sddm/omarchy
+    chmod -R go-w /usr/share/omarchy/default/sddm/omarchy
+else
+    echo "warning: /usr/share/sddm/themes/omarchy is missing; theme not mirrored" >&2
+fi
+echo "::endgroup::"
 
 # ---------------------------------------------------------------------------
 # Clean build artifacts so they don't ship in the image
@@ -527,3 +574,15 @@ rm -rf \
     /var/log/dnf.rpm.log \
     /var/log/hawkey.log
 echo "::endgroup::"
+}
+
+case "$PHASE" in
+  base) phase_base ;;
+  kernel) phase_kernel ;;
+  fresh) phase_fresh ;;
+  all) phase_base; phase_kernel; phase_fresh ;;
+  *)
+    echo "build.sh: unknown phase '${PHASE}' (expected base|kernel|fresh|all)" >&2
+    exit 1
+    ;;
+esac

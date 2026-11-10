@@ -19,6 +19,23 @@ FROM ghcr.io/ublue-os/base-main:latest
 # COPR, so the baked kernel version moves on every build. It is unsigned --
 # enabling Secure Boot requires enrolling a MOK yourself.
 
+### CACHE-BUSTING INPUTS
+## The build is split into three layers below, ordered by how often their
+## content really changes. A layer is invalidated when the build arg it
+## references changes, so freshness is paid for where it is needed instead of
+## throwing the whole layer cache away (`--no-cache`, which this replaced).
+##
+##   OMEDORA_BUST  every build (CI passes the run id). The Omedora COPR mutates
+##                 between builds of the same commit, so the volatile tail is
+##                 always re-resolved. This is the old --no-cache, scoped down.
+##   KERNEL_BUST   weekly scheduled builds and manual "fresh" runs: re-resolve
+##                 the CachyOS kernel from its COPR.
+##   ALL_BUST      weekly scheduled builds and manual "fresh" runs: rebuild every
+##                 layer from scratch, i.e. exactly what --no-cache used to do.
+ARG OMEDORA_BUST=0
+ARG KERNEL_BUST=0
+ARG ALL_BUST=0
+
 ### [IM]MUTABLE /opt
 ## Fedora's base image symlinks /opt -> /var/opt. RPMs such as brave-origin
 ## unpack into /opt and fail with "cpio: mkdir failed - File exists" unless
@@ -28,11 +45,34 @@ RUN rm /opt && mkdir /opt
 ### MODIFICATIONS
 ## Everything (packages, SDDM, Omarchy defaults, Hurunagus overrides) happens in
 ## build.sh. It is mounted at /ctx so it can see build_files/ and system_files/.
+## Each RUN below is one phase (see the header of build.sh) and one cacheable
+## layer; ALL_BUST is threaded through all three so a scheduled build can force
+## a full rebuild the way --no-cache used to.
+
+## Phase 1/3 -- the stable bulk: repos, the whole package install, system files,
+## services. This is the ~10 minute part and the one worth reusing.
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     --mount=type=tmpfs,dst=/tmp \
-    /ctx/build.sh
+    ALL_BUST="${ALL_BUST}" /ctx/build.sh base
+
+## Phase 2/3 -- the CachyOS kernel swap and its initramfs. The kernel COPR moves
+## on its own schedule, so this is refreshed by the weekly build rather than by
+## every push.
+RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=cache,dst=/var/cache \
+    --mount=type=cache,dst=/var/log \
+    --mount=type=tmpfs,dst=/tmp \
+    ALL_BUST="${ALL_BUST}" KERNEL_BUST="${KERNEL_BUST}" /ctx/build.sh kernel
+
+## Phase 3/3 -- the volatile tail: re-resolve the Omedora payload, re-mirror its
+## SDDM theme, clean build artifacts. Invalidated on every build.
+RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=cache,dst=/var/cache \
+    --mount=type=cache,dst=/var/log \
+    --mount=type=tmpfs,dst=/tmp \
+    ALL_BUST="${ALL_BUST}" OMEDORA_BUST="${OMEDORA_BUST}" /ctx/build.sh fresh
 
 # Rebrand system identifiers in /usr/lib/os-release
 RUN sed -i \
