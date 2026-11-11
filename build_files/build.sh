@@ -57,23 +57,21 @@ mapfile -t PACKAGES < /tmp/hurunagus-packages.txt
 # Packages we deliberately do not ship, even though Omarchy's base list
 # includes them:
 #
-#   * chromium, kdenlive, obs-studio are duplicated by the system Flatpaks
-#     in system-flatpaks.list.
-#   * The rest are Omarchy preinstalled apps that upstream itself offers to
-#     remove via omarchy-remove-preinstalls (libreoffice-fresh maps to
-#     libreoffice on Fedora).
+#   * chromium is duplicated by the system Flatpaks in system-flatpaks.list.
+#   * omacut and omawrite are Omarchy preinstalled apps that upstream itself
+#     offers to remove via omarchy-remove-preinstalls.
+#
+# A name belongs here only while it is still in omarchy-base.packages. Upstream
+# churns that list every release - 4.5 dropped kdenlive, obs-studio, lazydocker
+# and xournalpp - and an exclusion that matches nothing only looks meaningful.
+# Re-check this block after every base bump.
 #
 # Keep this filter here instead of editing omarchy-base.packages so the
 # vendored Omarchy list stays easy to compare with upstream.
 EXCLUDED_PACKAGES=(
     chromium
-    kdenlive
-    obs-studio
-    libreoffice
-    xournalpp
     omacut
     omawrite
-    lazydocker
 )
 
 filtered_packages=()
