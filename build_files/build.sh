@@ -58,8 +58,13 @@ mapfile -t PACKAGES < /tmp/hurunagus-packages.txt
 # includes them:
 #
 #   * chromium is duplicated by the system Flatpaks in system-flatpaks.list.
-#   * omacut and omawrite are Omarchy preinstalled apps that upstream itself
-#     offers to remove via omarchy-remove-preinstalls.
+#   * omacut, omawrite, hype, monologue and signed are Omarchy preinstalled
+#     apps that upstream itself offers to remove via omarchy-remove-preinstalls
+#     (4.5 added the last three). omasnap and owe are NOT in this class - the
+#     screenshot overlay and the wallpaper engine are wired into the desktop
+#     with no fallback (omarchy-capture-screenshot execs omasnap;
+#     omarchy-theme-bg-boot-intro drives owe) - and disktree is 4.5's disk tool,
+#     the replacement for the dua-cli it dropped.
 #
 # A name belongs here only while it is still in omarchy-base.packages. Upstream
 # churns that list every release - 4.5 dropped kdenlive, obs-studio, lazydocker
@@ -70,8 +75,11 @@ mapfile -t PACKAGES < /tmp/hurunagus-packages.txt
 # vendored Omarchy list stays easy to compare with upstream.
 EXCLUDED_PACKAGES=(
     chromium
+    hype
+    monologue
     omacut
     omawrite
+    signed
 )
 
 filtered_packages=()
