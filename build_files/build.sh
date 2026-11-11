@@ -66,15 +66,22 @@ mapfile -t PACKAGES < /tmp/hurunagus-packages.txt
 #     omarchy-theme-bg-boot-intro drives owe) - and disktree is 4.5's disk tool,
 #     the replacement for the dua-cli it dropped.
 #
-# A name belongs here only while it is still in omarchy-base.packages. Upstream
-# churns that list every release - 4.5 dropped kdenlive, obs-studio, lazydocker
-# and xournalpp - and an exclusion that matches nothing only looks meaningful.
-# Re-check this block after every base bump.
+# These match the RESOLVED RPM names, not the list's Arch names: the list says
+# libreoffice-fresh and the map turns it into Fedora's libreoffice, so that entry
+# is live even though the string is not in the list.
+#
+# A name belongs here only while the resolver still emits it. Upstream churns the
+# lists every release - 4.5 dropped kdenlive, obs-studio, lazydocker and xournalpp
+# - and an exclusion matching nothing only looks meaningful. Test it against the
+# resolver's output (`python3 build_files/fedora-resolve.py --map
+# build_files/fedora.toml build_files/omarchy-base.packages
+# build_files/fedora-baseline.packages`), not against the list text.
 #
 # Keep this filter here instead of editing omarchy-base.packages so the
 # vendored Omarchy list stays easy to compare with upstream.
 EXCLUDED_PACKAGES=(
     chromium
+    libreoffice
     hype
     monologue
     omacut
