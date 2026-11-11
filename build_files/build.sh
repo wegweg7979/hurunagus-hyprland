@@ -57,23 +57,36 @@ mapfile -t PACKAGES < /tmp/hurunagus-packages.txt
 # Packages we deliberately do not ship, even though Omarchy's base list
 # includes them:
 #
-#   * chromium, kdenlive, obs-studio are duplicated by the system Flatpaks
-#     in system-flatpaks.list.
-#   * The rest are Omarchy preinstalled apps that upstream itself offers to
-#     remove via omarchy-remove-preinstalls (libreoffice-fresh maps to
-#     libreoffice on Fedora).
+#   * chromium is duplicated by the system Flatpaks in system-flatpaks.list.
+#   * omacut, omawrite, hype, monologue and signed are Omarchy preinstalled
+#     apps that upstream itself offers to remove via omarchy-remove-preinstalls
+#     (4.5 added the last three). omasnap and owe are NOT in this class - the
+#     screenshot overlay and the wallpaper engine are wired into the desktop
+#     with no fallback (omarchy-capture-screenshot execs omasnap;
+#     omarchy-theme-bg-boot-intro drives owe) - and disktree is 4.5's disk tool,
+#     the replacement for the dua-cli it dropped.
+#
+# These match the RESOLVED RPM names, not the list's Arch names: the list says
+# libreoffice-fresh and the map turns it into Fedora's libreoffice, so that entry
+# is live even though the string is not in the list.
+#
+# A name belongs here only while the resolver still emits it. Upstream churns the
+# lists every release - 4.5 dropped kdenlive, obs-studio, lazydocker and xournalpp
+# - and an exclusion matching nothing only looks meaningful. Test it against the
+# resolver's output (`python3 build_files/fedora-resolve.py --map
+# build_files/fedora.toml build_files/omarchy-base.packages
+# build_files/fedora-baseline.packages`), not against the list text.
 #
 # Keep this filter here instead of editing omarchy-base.packages so the
 # vendored Omarchy list stays easy to compare with upstream.
 EXCLUDED_PACKAGES=(
     chromium
-    kdenlive
-    obs-studio
     libreoffice
-    xournalpp
+    hype
+    monologue
     omacut
     omawrite
-    lazydocker
+    signed
 )
 
 filtered_packages=()

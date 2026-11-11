@@ -328,7 +328,7 @@ reason = "AUR helper; AUR doesn't exist on Fedora. omedora-pkg-aur-add on Fedora
 [hyprland]
 source = "dnf"
 names = ["hyprland-no-session"]
-reason = "Hyprland not in Fedora 44 main repos; vendored as omedora/packaging/copr/hyprland.spec (0.56.1). On the Omarchy-4 line we install the hyprland-no-session subpackage (compositor + libs, NO wayland-sessions entries): omedora-settings ships the only session entry (omedora.desktop), so plain 'Hyprland' entries never appear in GDM. Replaces the retired hyprland-omedora shim, which omedora-settings Obsoletes. (Arch still installs the real hyprland.)"
+reason = "Hyprland not in Fedora 44 main repos; vendored as omedora/packaging/copr/hyprland.spec (0.56.2). On the Omarchy-4 line we install the hyprland-no-session subpackage (compositor + libs, NO wayland-sessions entries): omedora-settings ships the only session entry (omedora.desktop), so plain 'Hyprland' entries never appear in GDM. Replaces the retired hyprland-omedora shim, which omedora-settings Obsoletes. (Arch still installs the real hyprland.)"
 
 [hyprland-no-session]
 source = "dnf"
@@ -508,9 +508,330 @@ reason = "Not in Fedora main or RPM Fusion (verified against both, 2026-06-11); 
 [voxtype-bin]
 source = "dnf"
 names = ["voxtype"]
-reason = "voxtype-bin (the Arch package) maps to the single 'voxtype' RPM we build from source in the omedora COPR (omedora/packaging/copr/voxtype.spec: AndrewGaspar/voxtype fork feat/muse-stack-v1.0.1, CPU-only tiered whisper avx2/avx512/vulkan + OSD helpers). On-demand only (not in any base package set); installed by omarchy-pkg-add via bin/fedora/voxtype-install-pkg (base only — no GPU add-on subpackages; the Vulkan tier accelerates inference on any GPU vendor). dnf-updatable. wtype resolves natively. Bump = Version: / fork_commit + .sources sha in the spec."
+reason = "voxtype-bin (the Arch package) maps to the single 'voxtype' RPM we build from source in the omedora COPR (omedora/packaging/copr/voxtype.spec: AndrewGaspar/voxtype fork feat/muse-stack-v1.0.1, CPU-only tiered whisper avx2/avx512/vulkan + OSD helpers). On-demand only (not in any base package set); upstream's omarchy-install-dictation-voxtype installs it unpatched through this entry (`omarchy-pkg-add wtype voxtype-bin`; base only — no GPU add-on subpackages; the Vulkan tier accelerates inference on any GPU vendor). dnf-updatable. wtype resolves natively. Bump = Version: / fork_commit + .sources sha in the spec."
 
 [yaru-icon-theme]
 source = "dnf"
 names = ["yaru-theme"]
 reason = "Fedora packages the Yaru icon set inside the yaru-theme package (no standalone yaru-icon-theme). Verify at L3 smoke."
+
+# --- Omarchy 4.5 additions --------------------------------------------------
+
+[vi]
+source = "dnf"
+names = ["vim-minimal"]
+reason = "Fedora's vi is vim-minimal, which Provides vi. pkg.py verifies installs with rpm -q <name>, so the Provides alone isn't enough; name the real package."
+
+[ffmpeg]
+source = "dnf"
+names = ["ffmpeg"]
+satisfied_by = ["ffmpeg-free"]
+reason = "RPM Fusion's full ffmpeg CLI. Omedora enables RPM Fusion, and with it dnf resolves the omedora payload's libavcodec dependency to RPM Fusion's ffmpeg-libs (newer than Fedora's *-free libs), which conflicts with ffmpeg-free, so the matching CLI is RPM Fusion's. The full libraries also decode the H.264 theme intros owe plays. A user already on Fedora's ffmpeg-free stack keeps it (it counts as installed)."
+
+[qt6-base]
+source = "dnf"
+names = ["qt6-qtbase-devel"]
+reason = "Migration 1790702362 adds Qt for building Omarchy-style apps (qmake6 and headers). Arch's qt6-base carries those; on Fedora they are in -devel."
+
+[qt6-declarative]
+source = "dnf"
+names = ["qt6-qtdeclarative-devel"]
+reason = "See qt6-base: development files for building Qt Quick apps."
+
+[qt6-multimedia]
+source = "dnf"
+names = ["qt6-qtmultimedia-devel"]
+reason = "See qt6-base."
+
+[qt6-svg]
+source = "dnf"
+names = ["qt6-qtsvg-devel"]
+reason = "See qt6-base."
+
+[qt6-wayland]
+source = "dnf"
+names = ["qt6-qtwayland-devel"]
+reason = "See qt6-base."
+
+[pipewire-libcamera]
+source = "dnf"
+names = ["pipewire-plugin-libcamera"]
+reason = "Fedora's name for PipeWire's libcamera backend (Qualcomm and ThinkPad T14s camera scripts)."
+
+[omarchy-power-profiles-daemon]
+source = "skip"
+reason = "Omarchy's power-profiles-daemon fork (ARM cppc profiles). Omedora keeps Fedora's tuned-ppd plus the powerprofilesctl shim (see power-profiles-daemon). The entry must exist: a skip counts as installed, which keeps migration 1791554699's pacman swap from ever being reached."
+
+[slack-desktop]
+source = "flathub"
+app_id = "com.slack.Slack"
+reason = "4.5's Install > Service > Slack. Slack ships no Fedora repo package we can pull; Flathub's com.slack.Slack is the maintained Linux build. omarchy-install-and-launch launches it by its Flatpak app id on Fedora."
+
+[superwhisper-bin]
+source = "skip"
+reason = "Proprietary vendor tarball (tux.superwhisper.com), not redistributable through a COPR (same reasoning as claude-code). It is 4.5's default dictation backend; on Fedora dictation stays unbound until a backend is installed (Setup > Defaults > Dictation > Voxtype uses the COPR voxtype RPM)."
+
+[omasnap]
+source = "dnf"
+names = ["omasnap"]
+reason = "4.5's screenshot + annotation overlay (Qt6/C++, github.com/omacom/omasnap, MIT). omarchy-capture-screenshot execs it. Not in Fedora; built from source by omedora/packaging/copr/omasnap.spec (CMake, no vendoring). Needs a COPR build before the 4.5 release."
+
+[owe]
+source = "dnf"
+names = ["owe"]
+reason = "Omarchy's video wallpaper engine (C/meson, github.com/omacom/owe): theme intro and video backgrounds, owed.service, and the theme-set sync hook. Not in Fedora; built from source by omedora/packaging/copr/owe.spec. Needs a COPR build before the 4.5 release."
+
+[owe-lockfeed]
+source = "skip"
+reason = "owe's lock-screen QML feed plugin. 4.5's lock screen uses a still poster, not the feed, and owe.spec doesn't build the plugin yet. Only migration 1789764927 asks for it."
+
+[omarchy-hyprland-titlebars]
+source = "skip"
+reason = "Hyprland plugin (hyprbars fork) for 4.5's floating-workspace mode. Not packaged: a plugin loads only into the exact Hyprland build it was compiled against, so it would need an exact-EVR Requires and a rebuild with every hyprland.spec build (and its HypXR consumers). workspace-modes.lua skips titlebars when the .so is absent."
+
+[hype]
+source = "dnf"
+names = ["hype"]
+reason = "Markdown slides app (Qt6, github.com/omacom/hype), a removable preinstall. Not in Fedora; built from source by omedora/packaging/copr/hype.spec (qmake6, like omacut). Requires ffmpeg/ffprobe by path and source-highlight."
+
+[monologue]
+source = "dnf"
+names = ["monologue"]
+reason = "Webcam recorder (Qt6, github.com/omacom/monologue), a removable preinstall. Not in Fedora; built from source by omedora/packaging/copr/monologue.spec (qmake6, like omacut). Requires ffmpeg/ffprobe by path."
+
+[signed]
+source = "dnf"
+names = ["signed"]
+reason = "PDF signing/filling app (Qt6 + poppler-qt6 + qpdf, github.com/omacom/signed), a removable preinstall. Not in Fedora; built from source by omedora/packaging/copr/signed.spec (qmake6, like omacut)."
+
+[gliff]
+source = "skip"
+reason = "Hyprland remote desktop over SSH (Rust, github.com/omacom/gliff). Not packaged: its Cargo tree builds Cisco OpenH264 from source (openh264-sys2), a patent-encumbered codec that neither Fedora nor COPR may ship. The remote-session indicator just finds no gliff-server."
+
+[disktree-bin]
+source = "dnf"
+names = ["disktree"]
+reason = "Disk-usage treemap GUI (tobi/disktree, MIT), 4.5's dua-cli replacement. Not in Fedora; omedora/packaging/copr/disktree.spec repackages the upstream x86_64 release binary, as Arch's disktree-bin does (like lazygit.spec)."
+
+[asus-proart-p14-speaker-firmware]
+source = "skip"
+reason = "Arm (NVIDIA N1x) laptop firmware; Omedora doesn't own firmware or aarch64 platform packages."
+
+[dell-xps13-sidecar-amps]
+source = "skip"
+reason = "Dell XPS 13 speaker amplifier setup that rebuilds the boot image; boot/initramfs are Fedora's. Its migration (1787666837) is Fedora-gated."
+
+# --- Omarchy 4.5-rc3 additions ----------------------------------------------
+
+[xorg-xsetroot]
+source = "dnf"
+names = ["xsetroot"]
+reason = "4.5-rc3 resets the X11 root cursor with xsetroot when the desktop is revealed (default/hypr/startup-cursor.lua), so XWayland apps don't keep a transparent cursor. Fedora split xorg-x11-server-utils into per-tool packages; this one is xsetroot. Migration 1793512402 adds it to existing installs through this entry."
+
+# --- Menu installers (Install / Setup > Defaults rows; test/menu-pkg-audit-test.sh)
+# Every package a menu row checks or installs is mapped here, listed in the
+# audit's reviewed same-name allowlist, or reached only from a row with a
+# Fedora `when` gate. Availability checked against Fedora 44 + RPM Fusion
+# (`dnf repoquery`) and flathub.org on 2026-10-27.
+
+[bitwarden]
+source = "flathub"
+app_id = "com.bitwarden.desktop"
+reason = "Install > Service > Bitwarden. Not in Fedora or RPM Fusion; Flathub's com.bitwarden.desktop is published and verified by Bitwarden Inc. omarchy-install-and-launch launches it by its app id on Fedora."
+
+[bitwarden-cli]
+source = "skip"
+reason = "Bitwarden's CLI ships through npm/snap only; no Fedora, RPM Fusion or Flathub package (the Flathub desktop app carries no CLI). Install > Service > Bitwarden still installs the desktop app; it only reports this skip."
+
+[minecraft-launcher]
+source = "flathub"
+app_id = "com.mojang.Minecraft"
+reason = "Install > Gaming > Minecraft. Mojang ships no Fedora package; Flathub's com.mojang.Minecraft is the long-maintained wrapper of the official launcher. omarchy-install-and-launch launches it by its app id; Remove uninstalls the Flatpak."
+
+[heroic-games-launcher-bin]
+source = "flathub"
+app_id = "com.heroicgameslauncher.hgl"
+reason = "Install > Gaming > Heroic. Not in Fedora or RPM Fusion; Flathub's com.heroicgameslauncher.hgl is verified by the Heroic team. The installer's trailing `gtk-launch heroic` misses the Flatpak's desktop id, so it opens from the launcher instead."
+
+[ollama-cuda]
+source = "dnf"
+names = ["ollama"]
+reason = "Install > AI > Ollama picks ollama-cuda when nvidia-smi exists. Fedora ships no CUDA build (CUDA is not redistributable in Fedora); its ollama runs the CPU and ROCm backends, which is what an NVIDIA machine gets until a CUDA variant exists."
+
+[ollama-rocm]
+source = "dnf"
+names = ["ollama"]
+reason = "Install > AI > Ollama picks ollama-rocm when rocminfo exists. Fedora's single ollama RPM already ships the ROCm backend (/usr/lib/ollama/libggml-hip.so)."
+
+[vim]
+source = "dnf"
+names = ["vim-enhanced"]
+reason = "Install > Editor > Vim and Setup > Defaults > Editor > Vim. Fedora's vim is vim-enhanced, which Provides vim; pkg.py verifies installs with rpm -q <name>, so the Provides alone made `omarchy-pkg-add vim` report a failed install (same as [vi])."
+
+[lib32-vulkan-intel]
+source = "dnf"
+names = ["mesa-vulkan-drivers.i686"]
+reason = "omarchy-install-gaming-gpu-lib32 (Steam, Lutris, Heroic, Battle.net). Fedora's 32-bit Mesa Vulkan drivers (Intel and AMD alike) are the i686 build of mesa-vulkan-drivers; there is no lib32- package."
+
+[lib32-vulkan-radeon]
+source = "dnf"
+names = ["mesa-vulkan-drivers.i686"]
+reason = "See [lib32-vulkan-intel]: the same i686 mesa-vulkan-drivers serves AMD."
+
+[lib32-nvidia-utils]
+source = "skip"
+reason = "NVIDIA's 32-bit userspace on Fedora is RPM Fusion's xorg-x11-drv-nvidia-libs.i686, which pulls the akmod driver stack; kernel drivers are the user's (omedora/AGENTS.md §6). Users on RPM Fusion's driver install it with the driver."
+
+[lib32-nvidia-580xx-utils]
+source = "skip"
+reason = "See [lib32-nvidia-utils]: the legacy-branch NVIDIA userspace is likewise part of the user's driver install."
+
+[wine-staging]
+source = "dnf"
+names = ["wine"]
+reason = "omarchy-install-gaming-lutris. Fedora ships upstream Wine (wine), with no staging build; Lutris downloads its own Wine runners for games that need one."
+
+[wine-gecko]
+source = "dnf"
+names = ["mingw32-wine-gecko", "mingw64-wine-gecko"]
+reason = "omarchy-install-gaming-lutris. Fedora splits Wine's Gecko into the mingw32/mingw64 builds."
+
+[python-protobuf]
+source = "dnf"
+names = ["python3-protobuf"]
+reason = "omarchy-install-gaming-lutris. Fedora's Python 3 module naming."
+
+[umu-launcher]
+source = "skip"
+reason = "Not in Fedora, RPM Fusion or Flathub. Lutris works without it (it fetches its own runtimes), so Install > Gaming > Lutris only reports this skip; Install > Gaming > Battle.net, which runs through umu, is hidden on Fedora. Packaging candidate (Python + zipapp, no compiled parts)."
+
+[openbsd-netcat]
+source = "dnf"
+names = ["netcat"]
+satisfied_by = ["nmap-ncat"]
+reason = "Install > Windows (omarchy-windows-vm). Fedora's netcat is the OpenBSD netcat; nmap-ncat (the usual /usr/bin/nc on Fedora) serves the same purpose and is kept when present."
+
+[dropbox-cli]
+source = "skip"
+reason = "No dropbox-cli on Fedora: RPM Fusion's dropbox ships the same control script as /usr/bin/dropbox, but the Dropbox panel and installer call dropbox-cli, so Install > Service > Dropbox is hidden on Fedora. Follow-up: a Fedora installer with a dropbox-cli shim."
+
+[python-gpgme]
+source = "dnf"
+names = ["python3-gpg"]
+reason = "Dropbox's signature check. Fedora's Python GPGME bindings are python3-gpg."
+
+[t3code-bin]
+source = "skip"
+reason = "AUR-only. Install > AI > T3 Code installs the upstream AppImage on every distro, which Remove > AI > T3 Code already finds by path."
+
+[t3code-nightly-bin]
+source = "skip"
+reason = "See [t3code-bin]."
+
+[claude-desktop]
+source = "skip"
+reason = "Not in Fedora, RPM Fusion or Flathub. Install > AI > Claude Desktop is hidden on Fedora (its row's distro gate), so only Remove's guard asks for it."
+
+[openai-codex-desktop]
+source = "skip"
+reason = "ChatGPT/Codex desktop is AUR-only; not in Fedora, RPM Fusion or Flathub. Install > AI > ChatGPT Desktop is hidden on Fedora."
+
+[amp-desktop-bin]
+source = "skip"
+reason = "4.5.0's Install > AI > Amp Desktop. Amp ships only a vendor .deb (static.ampcode.com), which the AUR package repackages; not in Fedora, RPM Fusion or Flathub, and not redistributable through a COPR. Install > AI > Amp Desktop is hidden on Fedora; Remove > AI > Amp Desktop stays hidden because a skip is never present."
+
+[hermes-desktop]
+source = "skip"
+reason = "Hermes Desktop: omarchy-install-hermes-cli needs the Arch package's /usr/share/hermes-desktop/install.sh and /opt/hermes-desktop install stamp to set up in-app updates. Not in Fedora, RPM Fusion or Flathub. Install > AI > Hermes and Setup > Defaults > Agent > Hermes are hidden on Fedora. Packaging candidate: an RPM reproducing that layout, like the openclaw seed."
+
+[lmstudio-bin]
+source = "skip"
+reason = "LM Studio ships an AppImage only; not in Fedora, RPM Fusion or Flathub. Install > AI > LM Studio is hidden on Fedora."
+
+[perplexity]
+source = "skip"
+reason = "Perplexity's desktop app is AUR-only; not in Fedora, RPM Fusion or Flathub. Install > AI > Perplexity is hidden on Fedora."
+
+[cursor-bin]
+source = "skip"
+reason = "Cursor publishes no repository or Flathub app (AppImage and one-off .rpm downloads). Install > Editor > Cursor is hidden on Fedora, and Setup > Defaults > Editor > Cursor shows only once `cursor` is installed."
+
+[visual-studio-code-bin]
+source = "skip"
+reason = "Microsoft's VS Code RPM comes from Microsoft's own repo (a third-party repo needs approval, packages.md §7); Flathub's com.visualstudio.code is an unofficial, sandboxed wrapper with no `code` on PATH. Install > Editor > VSCode is hidden on Fedora; Setup > Defaults shows VSCode once `code` is installed."
+
+[zed]
+source = "skip"
+reason = "Zed is not in Fedora or RPM Fusion; Flathub's dev.zed.Zed puts no `zeditor` on PATH, which the Omarchy defaults need. Install > Editor > Zed is hidden on Fedora; Setup > Defaults shows Zed once `zeditor` is installed. Packaging candidate (Rust, large)."
+
+[omazed]
+source = "skip"
+reason = "Omarchy's Zed theme integration, installed with zed; see [zed]."
+
+[sublime-text-4]
+source = "skip"
+reason = "Sublime HQ's RPM comes from its own repo (a third-party repo needs approval, packages.md §7). Install > Editor > Sublime Text is hidden on Fedora; Setup > Defaults shows it once `subl` is installed."
+
+[omarchy-emacs]
+source = "skip"
+reason = "Omarchy's packaged Emacs configuration (omarchy-pkgs); not packaged for Fedora. Install > Editor > Emacs is hidden on Fedora; Setup > Defaults > Editor > Emacs shows once `emacs` (Fedora's own package) is installed."
+
+[google-chrome]
+source = "skip"
+reason = "Chrome comes from Google's own repo (google-chrome-stable; a third-party repo needs approval, packages.md §7), and omarchy-install-browser configures /opt and /etc paths a Flatpak doesn't have. Install > Browser > Chrome is hidden on Fedora; Setup > Defaults shows Chrome once google-chrome-stable is installed."
+
+[microsoft-edge-stable-bin]
+source = "skip"
+reason = "Edge comes from Microsoft's own repo; see [google-chrome]. Setup > Defaults shows Edge once microsoft-edge-stable is installed."
+
+[brave-bin]
+source = "skip"
+reason = "Brave comes from Brave's own repo, and omarchy-install-browser configures /opt/brave.com paths and the `brave` command, which Brave's RPM (brave-browser) and Flathub's com.brave.Browser don't provide. Install > Browser > Brave is hidden on Fedora."
+
+[brave-origin-bin]
+source = "skip"
+reason = "See [brave-bin]."
+
+[zen-browser-bin]
+source = "skip"
+reason = "Zen ships a tarball, AppImage and Flathub app (app.zen_browser.zen) but no Fedora package; omarchy-install-browser expects the `zen-browser` command and zen.desktop. Install > Browser > Zen is hidden on Fedora; Setup > Defaults shows Zen once `zen-browser` is installed."
+
+[1password]
+source = "skip"
+reason = "1Password's RPM comes from its own repo (a third-party repo needs approval, packages.md §7); Flathub's com.onepassword.OnePassword has no `1password` command or browser integration, which the installer uses. Install > Service > 1Password is hidden on Fedora."
+
+[nordvpn-bin]
+source = "skip"
+reason = "NordVPN's RPM comes from its own repo (a third-party repo needs approval). Install > Service > NordVPN is hidden on Fedora."
+
+[once-bin]
+source = "skip"
+reason = "37signals ONCE CLI, AUR-only. Install > Service > ONCE is hidden on Fedora."
+
+[symfony-cli]
+source = "skip"
+reason = "Symfony's CLI comes from Symfony's own Cloudsmith repo (third-party). Install > Development > PHP > Symfony is hidden on Fedora."
+
+[xpadneo-dkms]
+source = "skip"
+reason = "A DKMS kernel module; kernel modules are out of omedora's scope on Fedora (omedora/AGENTS.md §6). Install > Gaming > Xbox Controllers is hidden on Fedora."
+
+[ttf-meslo-nerd]
+source = "skip"
+reason = "Install > Style > Font > Meslo LG Mono. Fedora packages no Nerd Fonts; omedora-nerd-fonts carries only JetBrains Mono and Cascadia (the base fonts). The row is hidden on Fedora. Packaging candidate: add the family to omedora-nerd-fonts.spec (a release-tarball repackage)."
+
+[ttf-firacode-nerd]
+source = "skip"
+reason = "Install > Style > Font > Fira Code; see [ttf-meslo-nerd]."
+
+[ttf-victor-mono-nerd]
+source = "skip"
+reason = "Install > Style > Font > Victor Code; see [ttf-meslo-nerd]."
+
+[ttf-bitstream-vera-mono-nerd]
+source = "skip"
+reason = "Install > Style > Font > Bitstream Vera Mono; see [ttf-meslo-nerd]."
+
+[ttf-iosevka-nerd]
+source = "skip"
+reason = "Install > Style > Font > Iosevka; see [ttf-meslo-nerd]."
