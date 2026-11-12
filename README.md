@@ -50,7 +50,9 @@ variant of Omarchy. Highlights:
 - **Omarchy** dotfiles under `~/.config/hypr` and `~/.config/omarchy` for the
   look & feel, keybindings and first-boot provisioning.
 - **Omedora** forked and modified to function correctly on immutable fedora (rpm-ostree / bootc).
-- **Scrolling window layout** as the default Hyprland layout. (niri like)
+- **Tiling by default** — nothing forces a global layout, so new workspaces tile
+  and each workspace keeps whatever `Super + L` cycles it to: tiling, scrolling,
+  or floating. (niri-like scrolling is still one keystroke away.)
 - **Wallpapers imported** from the original project into
   `~/.local/share/backgrounds` and `/usr/share/backgrounds/hurunagus`.
 - **SDDM user picker** — the Omarchy login theme with added user picker for multi-user systems.
