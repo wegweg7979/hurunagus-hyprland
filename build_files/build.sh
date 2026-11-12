@@ -58,13 +58,17 @@ mapfile -t PACKAGES < /tmp/hurunagus-packages.txt
 # includes them:
 #
 #   * chromium is duplicated by the system Flatpaks in system-flatpaks.list.
-#   * omacut, omawrite, hype, monologue and signed are Omarchy preinstalled
-#     apps that upstream itself offers to remove via omarchy-remove-preinstalls
-#     (4.5 added the last three). omasnap and owe are NOT in this class - the
-#     screenshot overlay and the wallpaper engine are wired into the desktop
-#     with no fallback (omarchy-capture-screenshot execs omasnap;
-#     omarchy-theme-bg-boot-intro drives owe) - and disktree is 4.5's disk tool,
-#     the replacement for the dua-cli it dropped.
+#   * omacut and omawrite are Omarchy preinstalled apps that upstream itself
+#     offers to remove via omarchy-remove-preinstalls.
+#
+# 4.5's other preinstalls (hype, monologue, signed) are NOT excluded, although
+# they are the same class: 4.5 ships a migration for each of them, and every one
+# of those migrations is nothing but `omarchy-pkg-add <app>`. With the app
+# excluded, that call hits this helper's "bake it into the image build" refusal,
+# exits 1, and - because omarchy-migrate is `set -e` - aborts the entire
+# migration run, hiding every later migration. Baking them is also the only way
+# they can exist at all: omarchy-pkg-drop refuses to remove a baked RPM, so
+# excluding them would not make them removable, only absent.
 #
 # These match the RESOLVED RPM names, not the list's Arch names: the list says
 # libreoffice-fresh and the map turns it into Fedora's libreoffice, so that entry
@@ -82,11 +86,8 @@ mapfile -t PACKAGES < /tmp/hurunagus-packages.txt
 EXCLUDED_PACKAGES=(
     chromium
     libreoffice
-    hype
-    monologue
     omacut
     omawrite
-    signed
 )
 
 filtered_packages=()
