@@ -14,23 +14,24 @@
 # This command replays ONLY the Hurunagus deltas, from the payload baked into
 # the image at /usr/share/hurunagus/config:
 #
-#   .config/omarchy/shell.json                bar at the bottom, transparent,
-#                                             Workspaces plus widget on the left,
-#                                             media in the centre, idle 300/900,
-#                                             Power profile widget on the right
+#   .config/omarchy/shell.json                bar at the bottom and clear,
+#                                             Omarchy's workspaces widget on the
+#                                             left, media in the centre, idle
+#                                             300/900, Power profile widget on
+#                                             the right
 #   .config/omarchy/shell.toml                shell base-size 18, bar height 30
-#   .config/omarchy/plugins/thord.workspaces  the Workspaces plus bar widget
 #   .config/omarchy/plugins/thord.powerprofile the CPU power profile bar widget
 #   .config/omarchy/extensions/omarchy-menu.jsonc  System > Power profile picker
 #   .config/omarchy/branding/screensaver.txt  HURUNAGUS idle screensaver art
 #   .config/omarchy/backgrounds/tokyo-night   the Hurunagus wallpaper set
-#   .config/hypr/looknfeel.lua                scrolling layout, column_width 0.97
 #   .config/foot/foot.ini                     translucent foot (alpha 0.8)
 #
 # Every other file in $HOME -- including the Omarchy defaults you have edited --
-# is left exactly as it is. Monitor layout is deliberately not in the payload:
-# it is the one setting that differs per machine. The generic 1080p rule this
-# image ships stays the untouched /etc/skel default.
+# is left exactly as it is. Replay only ever writes: a file dropped from the
+# payload stays on a machine that already has it, and is never deleted from
+# $HOME. Monitor layout is deliberately not in the payload: it is the one
+# setting that differs per machine. The generic 1080p rule this image ships
+# stays the untouched /etc/skel default.
 #
 # Per-file policy (the same coexistence contract omedora-seed-config uses):
 #

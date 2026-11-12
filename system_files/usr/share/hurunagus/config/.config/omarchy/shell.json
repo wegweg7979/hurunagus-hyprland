@@ -1,19 +1,30 @@
 {
   "bar": {
-    "centerAnchor": "omarchy.clock",
     "layout": {
-      "center": [
+      "left": [
+        {
+          "id": "omarchy.menu"
+        },
+        {
+          "id": "omarchy.workspaces"
+        }
+      ],
+      "centerBegin": [
         {
           "id": "omarchy.indicators"
-        },
+        }
+      ],
+      "center": [
         {
           "format": "dddd HH:mm",
           "formatAlt": "d MMMM 'W'ww yyyy",
           "id": "omarchy.clock",
           "verticalFormat": "HH\n—\nmm"
-        },
+        }
+      ],
+      "centerEnd": [
         {
-          "id": "omarchy.keyboard-layout"
+          "id": "omarchy.elsewhen"
         },
         {
           "id": "omarchy.weather"
@@ -25,22 +36,12 @@
           "id": "omarchy.system-update"
         }
       ],
-      "left": [
-        {
-          "id": "omarchy.menu"
-        },
-        {
-          "id": "thord.workspaces",
-          "perMonitor": true,
-          "showLayout": false,
-          "showWindowState": false,
-          "showWindows": false,
-          "showMinimized": false
-        }
-      ],
       "right": [
         {
           "id": "omarchy.tray"
+        },
+        {
+          "id": "omarchy.keyboard-layout"
         },
         {
           "id": "thord.powerprofile"
@@ -66,7 +67,7 @@
       ]
     },
     "position": "bottom",
-    "transparent": true
+    "background": "none"
   },
   "idle": {
     "lock": 900,
