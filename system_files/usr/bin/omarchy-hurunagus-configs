@@ -18,7 +18,7 @@
 #                                             Omarchy's workspaces widget on the
 #                                             left, media in the centre, idle
 #                                             300/900, Power profile widget on
-#                                             the right
+#                                             the right, no world clock
 #   .config/omarchy/shell.toml                shell base-size 18, bar height 30
 #   .config/omarchy/plugins/thord.powerprofile the CPU power profile bar widget
 #   .config/omarchy/extensions/omarchy-menu.jsonc  System > Power profile picker
