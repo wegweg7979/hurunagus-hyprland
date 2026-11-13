@@ -24,6 +24,9 @@
       ],
       "centerEnd": [
         {
+          "id": "huru.calendar"
+        },
+        {
           "id": "omarchy.weather"
         },
         {

@@ -188,6 +188,20 @@ dnf5 -y copr disable wegweg7979/airgraph
 echo "airgraph installed: $(rpm -q --qf '%{name}-%{version}-%{release}' airgraph)"
 echo "::endgroup::"
 
+# huru-calendar - iCloud (CalDAV) calendar sync daemon. Headless Go, so unlike
+# the other apps here it drags in no Qt at all; it is the data source behind the
+# huru.calendar bar widget in the Hurunagus payload (system_files/usr/share/
+# hurunagus/config/.config/omarchy/plugins/). Our own repo, our own COPR, so the
+# image only installs it and turns the repo off again -- nothing on the host
+# consumes it at runtime. Deliberately unguarded: an image that silently ships
+# without the calendar is worse than a red build.
+echo "::group:: Installing huru-calendar (iCloud calendar daemon)"
+dnf5 -y copr enable wegweg7979/huru-calendar
+dnf5 install -y huru-calendar
+dnf5 -y copr disable wegweg7979/huru-calendar
+echo "huru-calendar installed: $(rpm -q --qf '%{name}-%{version}-%{release}' huru-calendar)"
+echo "::endgroup::"
+
 install_packages() {
     local failed=() package required_failed=0
 

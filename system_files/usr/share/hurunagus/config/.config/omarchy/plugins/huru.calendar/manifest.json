@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "id": "huru.calendar",
+  "name": "Huru Calendar",
+  "version": "1.0.0",
+  "author": "Hurunagus",
+  "license": "MIT",
+  "description": "iCloud agenda on the Omarchy bar: the next event beside the clock, and a popup with the days ahead. Reads the hcal daemon over IPC, so nothing but the daemon (pure Go) has to run.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Calendar.qml"
+  },
+  "barWidget": {
+    "displayName": "Huru Calendar",
+    "description": "Next event on the bar and the coming days in the popup, from iCloud via the hcal daemon (hcal ipc events.list).",
+    "category": "Calendar",
+    "aliases": [
+      "calendar",
+      "agenda",
+      "icloud",
+      "huru-calendar"
+    ],
+    "allowMultiple": false,
+    "defaultSection": "centerEnd",
+    "defaults": {
+      "days": 7,
+      "showLabel": false,
+      "showCancelled": false,
+      "hideDeclined": true
+    },
+    "schema": [
+      {
+        "key": "days",
+        "type": "integer",
+        "label": "Days ahead",
+        "min": 1,
+        "max": 31,
+        "step": 1,
+        "defaultValue": 7,
+        "description": "How far the popup looks ahead."
+      },
+      {
+        "key": "showLabel",
+        "type": "boolean",
+        "label": "Show the next event's time beside the icon",
+        "defaultValue": false
+      },
+      {
+        "key": "showCancelled",
+        "type": "boolean",
+        "label": "Include cancelled events",
+        "defaultValue": false
+      },
+      {
+        "key": "hideDeclined",
+        "type": "boolean",
+        "label": "Hide events you declined",
+        "defaultValue": true
+      }
+    ]
+  }
+}
