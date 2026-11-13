@@ -175,6 +175,19 @@ if [[ -x /tmp/cliamp || -f /tmp/cliamp ]]; then
 fi
 echo "::endgroup::"
 
+# airgraph - Wi-Fi channel/congestion viewer (Qt Quick, unprivileged over
+# NetworkManager D-Bus). Our own app: built from its own repo and published to
+# its own COPR, so the image only has to install it. Every runtime dep it needs
+# (qt6-qtbase/-qtdeclarative/-qtwayland, NetworkManager; iw via Recommends) is
+# already present in this image. The repo is enabled only for the install --
+# unlike the Omedora COPR above, nothing on the host updates from it.
+echo "::group:: Installing airgraph (Wi-Fi channel viewer)"
+dnf5 -y copr enable wegweg7979/airgraph
+dnf5 install -y airgraph
+dnf5 -y copr disable wegweg7979/airgraph
+echo "airgraph installed: $(rpm -q --qf '%{name}-%{version}-%{release}' airgraph)"
+echo "::endgroup::"
+
 install_packages() {
     local failed=() package required_failed=0
 
