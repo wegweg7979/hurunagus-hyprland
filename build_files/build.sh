@@ -331,6 +331,12 @@ systemctl enable sddm.service
 
 enable_unit bluetooth.service
 enable_unit NetworkManager.service
+# sshd: the boxes share their ~/Public folder over SFTP (sftp://<alias>/var/home/dan/Public),
+# so the server must listen out of the box. Fedora's 81-desktop.preset disables sshd
+# and package-install presets do not fire inside the build container, which is why a
+# fresh box has always come up without it; port 22 is already in firewalld's public
+# zone, so this needs no firewall, SELinux or extra package.
+enable_unit sshd.service
 enable_unit cups.service
 enable_unit cups-browsed.service
 enable_unit avahi-daemon.service
