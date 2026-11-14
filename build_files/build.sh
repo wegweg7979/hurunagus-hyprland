@@ -202,6 +202,18 @@ dnf5 -y copr disable wegweg7979/huru-calendar
 echo "huru-calendar installed: $(rpm -q --qf '%{name}-%{version}-%{release}' huru-calendar)"
 echo "::endgroup::"
 
+# rclone - cloud storage (Google Drive, iCloud Drive) mounted as local folders so
+# the remotes appear in Nautilus like any other filesystem. Plain Fedora repo
+# package whose only deps are glibc/filesystem, and fuse3 is already in this
+# image; the drive and iclouddrive backends are both compiled in. Deliberately
+# unguarded: this is the app whose silent absence made the earlier attempt
+# undiagnosable, so a red build beats an image that quietly lacks it. The
+# per-user rclone.conf carries OAuth tokens and is never baked in here.
+echo "::group:: Installing rclone (cloud storage mounts)"
+dnf5 install -y rclone
+echo "rclone installed: $(rclone version | head -n1)"
+echo "::endgroup::"
+
 install_packages() {
     local failed=() package required_failed=0
 
