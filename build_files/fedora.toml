@@ -835,3 +835,31 @@ reason = "Install > Style > Font > Bitstream Vera Mono; see [ttf-meslo-nerd]."
 [ttf-iosevka-nerd]
 source = "skip"
 reason = "Install > Style > Font > Iosevka; see [ttf-meslo-nerd]."
+
+# CJK input methods: engines the user does not want. These are skip entries, not
+# EXCLUDED_PACKAGES lines, because something ADDS them at runtime:
+# migrations/1791367434.sh runs `omarchy-pkg-add fcitx5-mozc fcitx5-hangul
+# fcitx5-chinese-addons fcitx5-chewing`, and Setup > Typing > Input Methods does
+# the same per engine. `add` on a skip entry prints the reason and exits 0, so
+# the migration queue continues; an excluded-but-unmapped package instead answers
+# "bake it into the image build" and exits 1, which aborts every later migration
+# (the trap documented in build.sh's EXCLUDED_PACKAGES comment).
+[fcitx5-mozc]
+source = "skip"
+reason = "Japanese input (fcitx5 mozc engine). Not shipped: no CJK typing on this desktop. Upstream carries it in the base list and migrations/1791367434.sh adds it by name; this entry keeps that add a clean no-op."
+
+[fcitx5-hangul]
+source = "skip"
+reason = "Korean input (fcitx5 hangul engine). Not shipped; see [fcitx5-mozc]."
+
+[fcitx5-chewing]
+source = "skip"
+reason = "Chinese input (fcitx5 chewing engine, zhuyin). Not shipped; see [fcitx5-mozc]."
+
+[fcitx5-chinese-addons]
+source = "skip"
+reason = "Chinese input (fcitx5 pinyin and table engines). Not shipped; see [fcitx5-mozc]."
+
+[fcitx5-table-extra]
+source = "skip"
+reason = "Extra fcitx5 table engines (cangjie5 and friends). Not shipped; see [fcitx5-mozc]."

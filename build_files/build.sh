@@ -88,6 +88,22 @@ EXCLUDED_PACKAGES=(
     libreoffice
     omacut
     omawrite
+    # The Docker stack. omarchy's list carries docker + docker-buildx +
+    # docker-compose, and the map turns `docker` into Fedora's moby-engine +
+    # docker-cli, which then drags containerd in behind it and leaves a disabled
+    # daemon installed. Nothing on this desktop needs it (podman is what the
+    # image recipes use), and the Install > Development > Docker DB row is gated
+    # on `docker` being present, so dropping the stack hides the row instead of
+    # offering a command that cannot run.
+    moby-engine
+    docker-cli
+    docker-buildx
+    docker-compose
+    # CJK glyph coverage. The IME engines are skip-mapped in fedora.toml (the
+    # runtime adders need that); these are just the fonts, which nothing adds at
+    # runtime, so the bake filter is the right seam.
+    google-noto-sans-cjk-fonts
+    google-noto-serif-cjk-fonts
 )
 
 filtered_packages=()
@@ -126,6 +142,11 @@ EXTRA_PACKAGES=(
     # Btrfs maintenance timers (monthly scrub). Tuned by
     # /etc/default/btrfsmaintenance, which this image ships.
     btrfsmaintenance
+    # The locale the desktop actually uses. The base arrives with
+    # glibc-all-langpacks (all 200+ locales, ~227 MB); the trim below removes it,
+    # so this must be present or the host falls back to C formatting for dates,
+    # numbers and currency under LANG=en_GB.UTF-8.
+    glibc-langpack-en
 )
 
 # Brave browser repo
@@ -617,6 +638,61 @@ echo "::endgroup::"
 
 # ---------------------------------------------------------------------------
 # Clean build artifacts so they don't ship in the image
+# ---------------------------------------------------------------------------
+# Trimming what the base image drags in that nothing here uses
+# ---------------------------------------------------------------------------
+echo "::group:: Trimming unused packages"
+
+# None of these is a weak dependency of anything THIS build installs: the
+# parents are base-image packages (linux-firmware recommends the NVIDIA firmware
+# blobs; gnome-shell recommends ibus) or the package is an orphan already in the
+# base's set. So `--setopt=install_weak_deps=False` would NOT remove them, and
+# the KEEPERS that flag would have taken by accident (mesa-vulkan-drivers,
+# vulkan-loader, iw for the Wi-Fi tooling, linux-firmware itself) are
+# deliberately absent from the list below.
+#
+#   nvidia-gpu-firmware    NVIDIA firmware blobs; this desktop is Intel iGPU.
+#   glibc-all-langpacks    all 200+ locales. LANG=en_GB.UTF-8 needs only the
+#                          `en` langpack, which EXTRA_PACKAGES now installs;
+#                          removing this without that would strand the host on C.
+#   python3-botocore       AWS SDK bindings; nothing in this image or in omedora
+#                          talks to AWS.
+#   cosign                 signature CLI. containers/image verifies this image
+#                          through the sigstoreSigned policy in
+#                          /etc/containers/policy.json using its vendored
+#                          library, not this binary, and no file in the image
+#                          repo, system_files or omedora calls it — but it IS a
+#                          signing tool, so re-check it after the next rebase.
+#   ibus, ibus-*, cldr-*   ibus plus every engine and its CLDR data. The CJK
+#                          input methods are skip-mapped in fedora.toml (no CJK
+#                          typing on this desktop), fcitx5 does not need ibus,
+#                          and nothing in system_files or omedora references it.
+#   qt6-qtmultimedia-devel build-only Qt headers that arrived with the toolkit;
+#                          the base's own list has no such package and nothing
+#                          installed requires or recommends it. The runtime
+#                          qt6-qtmultimedia stays.
+#
+# Transaction preview before spending a build (changes nothing):
+#   dnf5 remove -y --assumeno <the list below>
+dnf5 remove -y \
+    nvidia-gpu-firmware \
+    glibc-all-langpacks \
+    python3-botocore \
+    cosign \
+    ibus \
+    ibus-anthy \
+    ibus-anthy-python \
+    ibus-hangul \
+    ibus-libpinyin \
+    ibus-m17n \
+    ibus-setup \
+    ibus-typing-booster \
+    cldr-emoji-annotation \
+    cldr-emoji-annotation-dtd \
+    qt6-qtmultimedia-devel || true
+
+echo "::endgroup::"
+
 # ---------------------------------------------------------------------------
 echo "::group:: Cleaning up"
 dnf5 clean all
