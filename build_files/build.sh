@@ -100,8 +100,13 @@ EXCLUDED_PACKAGES=(
     docker-buildx
     docker-compose
     # CJK glyph coverage. The IME engines are skip-mapped in fedora.toml (the
-    # runtime adders need that); these are just the fonts, which nothing adds at
-    # runtime, so the bake filter is the right seam.
+    # runtime adders need that); these are the fonts. This filter only reaches
+    # the build's OWN resolved list, so it is NOT sufficient on its own:
+    # google-noto-sans-cjk-fonts also ships in the ublue base, and the three
+    # *-cjk-vf-fonts packages are never on that list at all (they arrive as
+    # dependencies of default-fonts-cjk-*). The removal block below is what
+    # actually drops the stack — verify with `rpm -qa | grep -i cjk` on the
+    # BUILT image, never on the resolver output.
     google-noto-sans-cjk-fonts
     google-noto-serif-cjk-fonts
 )
@@ -671,6 +676,13 @@ echo "::group:: Trimming unused packages"
 #                          the base's own list has no such package and nothing
 #                          installed requires or recommends it. The runtime
 #                          qt6-qtmultimedia stays.
+#   google-noto-*cjk-*     the CJK font stack, ~241 MiB, none of it used here.
+#   default-fonts-cjk-*    The four font packages are BASE packages (or arrive
+#                          as deps of the three metas), which is why the
+#                          EXCLUDED_PACKAGES filter above cannot drop them: it
+#                          only prunes this build's resolved list. Remove the
+#                          metas together with the fonts, or the -vf packages
+#                          come straight back. Cost: CJK text renders as tofu.
 #
 # Transaction preview before spending a build (changes nothing):
 #   dnf5 remove -y --assumeno <the list below>
@@ -689,7 +701,14 @@ dnf5 remove -y \
     ibus-typing-booster \
     cldr-emoji-annotation \
     cldr-emoji-annotation-dtd \
-    qt6-qtmultimedia-devel || true
+    qt6-qtmultimedia-devel \
+    google-noto-sans-cjk-fonts \
+    google-noto-sans-cjk-vf-fonts \
+    google-noto-serif-cjk-vf-fonts \
+    google-noto-sans-mono-cjk-vf-fonts \
+    default-fonts-cjk-sans \
+    default-fonts-cjk-serif \
+    default-fonts-cjk-mono || true
 
 echo "::endgroup::"
 
