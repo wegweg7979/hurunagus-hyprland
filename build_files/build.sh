@@ -152,6 +152,13 @@ EXTRA_PACKAGES=(
     # so this must be present or the host falls back to C formatting for dates,
     # numbers and currency under LANG=en_GB.UTF-8.
     glibc-langpack-en
+    # Voxtype, the dictation backend Setup > Defaults > Dictation offers. The RPM
+    # is in the omedora COPR (voxtype.spec) and wtype is already here, so this is
+    # the half that was missing: without it the menu row is gated away on an
+    # immutable host, because `omarchy-pkg-add voxtype-bin` can only answer
+    # "bake it into the image". Baked, the row shows and the installer's shared
+    # setup runs with the package already satisfied.
+    voxtype
 )
 
 # Brave browser repo
