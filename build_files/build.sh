@@ -247,6 +247,22 @@ dnf5 install -y rclone
 echo "rclone installed: $(rclone version | head -n1)"
 echo "::endgroup::"
 
+# icloud-for-omarchy - the iCloud suite as native apps: iCloud Drive kept in sync
+# both ways, the Photos app, and one shared Apple sign-in every component uses.
+# Upstream is third-party (MIT, mostly Rust, no Fedora packaging of its own), so
+# wegweg7979/icloud-for-omarchy-rpm holds the spec and this COPR builds it; the
+# repo is enabled only for the install, like the other app COPRs above.
+# Deliberately unguarded: an image that silently ships without it is worse than
+# a red build. The suite needs gnome-keyring (the session cookies live there),
+# nothing syncs until the user runs `icloud-session sign-in`, and iCloud Drive
+# stays off until `icloud-drive start` - neither is done by the package.
+echo "::group:: Installing icloud-for-omarchy (iCloud Drive, Photos, sign-in)"
+dnf5 -y copr enable wegweg7979/icloud-for-omarchy
+dnf5 install -y icloud-for-omarchy
+dnf5 -y copr disable wegweg7979/icloud-for-omarchy
+echo "icloud-for-omarchy installed: $(rpm -q --qf '%{name}-%{version}-%{release}' icloud-for-omarchy)"
+echo "::endgroup::"
+
 install_packages() {
     local failed=() package required_failed=0
 
