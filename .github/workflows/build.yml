@@ -89,6 +89,35 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # The Secure Boot signing key. It has to reach the image build as a podman
+      # build secret, never as a build arg -- build args are recorded in the
+      # image config and layer history. Pull requests (including forks) receive no
+      # secrets at all, so they build with signing switched OFF; that image is
+      # never published. On the published branch a missing key is a hard failure,
+      # because the alternative is publishing a kernel that Secure Boot would
+      # refuse while every log line looks green.
+      - name: Prepare Secure Boot signing key
+        id: sb-signing-key
+        env:
+          SB_SIGNING_KEY: ${{ secrets.SB_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${SB_SIGNING_KEY:-}" ]]; then
+            if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+              echo "SB_SIGNING=off" >> "${GITHUB_ENV}"
+              echo "::warning::SB_SIGNING_KEY is unavailable in this pull request: building with Secure Boot signing OFF (this image is not published)"
+            else
+              echo "::error::SB_SIGNING_KEY is not set, so the kernel would ship unsigned -- refusing to build the published image"
+              exit 1
+            fi
+          else
+            SB_KEY_FILE="${RUNNER_TEMP}/hurunagus-kernel.key"
+            printf '%s\n' "${SB_SIGNING_KEY}" > "${SB_KEY_FILE}"
+            chmod 600 "${SB_KEY_FILE}"
+            echo "SB_SIGNING_KEY_FILE=${SB_KEY_FILE}" >> "${GITHUB_ENV}"
+            echo "Secure Boot signing key materialized (${#SB_SIGNING_KEY} characters)"
+          fi
+
       # This actually builds the container image
       - name: Build Image
         id: build-image
@@ -107,6 +136,10 @@ jobs:
           BUILD_CACHE_REF: ${{ (github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) && format('{0}/{1}', env.IMAGE_REGISTRY, env.IMAGE_NAME) || '' }}
           BUILD_CACHE_PUSH: ${{ (github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) && '1' || '0' }}
         run: |
+          # The Secure Boot signature's KEY reaches the build as the podman
+          # secret materialized above (SB_SIGNING_KEY_FILE); only the on/off
+          # switch rides in EXTRA_BUILD_ARGS. sudo -E so both reach the recipe.
+          export EXTRA_BUILD_ARGS="${EXTRA_BUILD_ARGS} --build-arg SB_SIGNING=${SB_SIGNING:-on}"
           sudo -E $(command -v just) build \
             ${IMAGE_NAME} \
             ${DEFAULT_TAG}

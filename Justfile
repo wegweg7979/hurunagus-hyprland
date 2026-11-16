@@ -130,6 +130,15 @@ build $target_image=image_name $tag=default_tag:
         read -ra extra_build_args <<< "${EXTRA_BUILD_ARGS}"
         PODMAN_BUILD_ARGS+=("${extra_build_args[@]}")
     fi
+    # The Secure Boot signing key travels as a podman build secret, never as a
+    # build arg (build args are recorded in the image config and layer history).
+    # CI exports SB_SIGNING_KEY_FILE from the SB_SIGNING_KEY secret; a local
+    # build can export it too, otherwise the 'sign' phase fails on purpose
+    # rather than shipping an unsigned kernel. SB_SIGNING=off is the explicit
+    # opt-out (CI sets it for pull requests).
+    if [[ -n "${SB_SIGNING_KEY_FILE:-}" ]]; then
+        PODMAN_BUILD_ARGS+=(--secret "id=sb_signing_key,src=${SB_SIGNING_KEY_FILE}")
+    fi
     # Registry-backed layer cache, used when this podman knows the flags
     # (5.x+; GitHub's ubuntu runners qualify). BUILD_CACHE_REF is a bare
     # repository -- podman stores its cache manifests under its own tag, so

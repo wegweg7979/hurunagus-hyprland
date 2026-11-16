@@ -7,6 +7,7 @@
 #
 #   base    repos, the whole package install, system files, services  (cacheable)
 #   kernel  the CachyOS kernel swap and its initramfs                 (weekly)
+#   sign    Secure Boot signing of the kernel image                   (with the key)
 #   fresh   re-resolve the Omedora payload, re-mirror its SDDM theme,
 #           clean build artifacts                                    (every build)
 #   all     every phase in order (default)
@@ -427,10 +428,11 @@ phase_kernel() {
 # kernel into an atomic image. Kept in dnf5 form and trimmed to what this image
 # actually needs:
 #
-#   * Secure Boot signing is NOT ported: this image boots with Secure Boot
-#     disabled, so sbsign/sign-file/MOK enrollment would be dead weight. The
-#     kernel is therefore UNSIGNED -- enrolling a MOK is a prerequisite if
-#     Secure Boot is ever switched on.
+#   * Secure Boot signing is NOT done here: it is phase_sign below, one layer
+#     further on, so that the signed artifact, its verification and the key's
+#     provenance sit together (a build secret cannot be seen by the layer cache,
+#     so signing must not share a layer with the kernel swap). This phase leaves
+#     the kernel UNSIGNED on purpose.
 #   * The NVIDIA/akmods half is NOT ported: this image targets Intel iGPUs and
 #     installs no out-of-tree kernel modules. -devel-matched is still installed
 #     so that stays possible later.
@@ -633,6 +635,137 @@ echo "CachyOS kernel ${KERNEL_VERSION} installed"
 echo "::endgroup::"
 }
 
+phase_sign() {
+# ---------------------------------------------------------------------------
+# Secure Boot signing of the kernel image
+# ---------------------------------------------------------------------------
+# Upstream parity: Universal Blue's base kernel ships signed (by Fedora's signer
+# *and* by a ublue MOK key of its own) so the image can boot with firmware
+# Secure Boot on after a one-time enrollment of the public key. This phase does
+# the same for the CachyOS kernel, with a key this image owns.
+#
+# The chain it plugs into, verified against the packages this image actually
+# ships:
+#   firmware -> shimx64.efi  (Microsoft-signed, so firmware trusts it)
+#            -> grubx64.efi  (Fedora-signed, and grub carries the shim_lock
+#                             verifier -- once Secure Boot is on, grub refuses to
+#                             load a kernel whose signature it cannot check)
+#            -> vmlinuz      (signed HERE with our key; trusted through the
+#                             firmware MOK list or db)
+#
+# Scope:
+#   * Only the kernel image needs signing. kernel-cachyos signs all ~6500 of its
+#     modules with a key generated at kernel-build time and baked into this same
+#     vmlinuz -- that is the key the kernel's module verifier trusts, so module
+#     signing stays upstream's business.
+#   * Secure Boot itself stays OPTIONAL: nothing in this image requires it, and
+#     every hurunagus host may keep firmware Secure Boot off. This phase only
+#     makes it possible (one MOK enrollment per machine, see
+#     /usr/bin/hurunagus-enroll-secure-boot-key).
+#   * The private key never enters the image: CI passes it as a podman build
+#     secret (--secret id=sb_signing_key), so it exists only inside this RUN and
+#     appears in neither the final filesystem nor the image config/history. It
+#     is deliberately not a build arg -- build args are recorded in the image.
+#   * The public half is committed at ${SB_CERT} and is the single source of
+#     truth for both the signature and the enrollment helper. Rotating the key
+#     means committing the new certificate, which also invalidates this layer's
+#     cache by itself (the certificate is read from the image).
+#
+# SB_SIGNING=off is the deliberate opt-out; the default is to sign and to FAIL
+# the build when the key is missing, because quietly shipping an unsigned kernel
+# is the one outcome that must never reach the published tag.
+
+if [[ "${SB_SIGNING:-on}" != "on" ]]; then
+    echo "::group:: Signing the kernel for Secure Boot"
+    echo "SB_SIGNING=${SB_SIGNING}: kernel left UNSIGNED on purpose (no MOK will verify it)"
+    echo "::endgroup::"
+    return 0
+fi
+
+echo "::group:: Signing the kernel for Secure Boot"
+
+SB_CERT="/usr/share/hurunagus/secureboot/hurunagus-kernel.pem"
+SB_CERT_DER="/usr/share/hurunagus/secureboot/hurunagus-kernel.der"
+SB_KEY="${SB_SIGNING_KEY_FILE:-/run/secrets/sb_signing_key}"
+
+if [[ ! -f "${SB_CERT}" ]]; then
+    printf 'Secure Boot: the public certificate %s is missing from the image (expected from system_files)\n' \
+        "${SB_CERT}" >&2
+    exit 1
+fi
+
+KERNEL_VERSIONS=()
+while IFS= read -r kernel_dir; do
+    KERNEL_VERSIONS+=("${kernel_dir}")
+done < <(find /usr/lib/modules -mindepth 1 -maxdepth 1 -type d -printf '%f\n')
+if (( ${#KERNEL_VERSIONS[@]} != 1 )); then
+    printf 'Secure Boot: expected exactly one kernel in /usr/lib/modules, found %d: %s\n' \
+        "${#KERNEL_VERSIONS[@]}" "${KERNEL_VERSIONS[*]}" >&2
+    exit 1
+fi
+KERNEL_VERSION="${KERNEL_VERSIONS[0]}"
+VMLINUZ="/usr/lib/modules/${KERNEL_VERSION}/vmlinuz"
+
+# Re-running this phase by hand against an already-built image (the cheap way to
+# test it) must not stack a second signature on top of the first.
+if command -v sbverify >/dev/null 2>&1 && sbverify --cert "${SB_CERT}" "${VMLINUZ}" >/dev/null 2>&1; then
+    echo "${VMLINUZ} is already signed with ${SB_CERT}; nothing to do"
+else
+    if [[ ! -f "${SB_KEY}" ]]; then
+        cat >&2 <<EOF
+Secure Boot: no signing key at ${SB_KEY}, so ${VMLINUZ} would ship UNSIGNED.
+
+Pass the private key as a podman build secret, e.g.
+    podman build --secret id=sb_signing_key,src=<private key> ...
+or export SB_SIGNING_KEY_FILE for 'just build'. Only set SB_SIGNING=off to skip
+signing on purpose -- CI does that for pull requests, which are never published.
+EOF
+        exit 1
+    fi
+
+    dnf5 install -y sbsigntools
+
+    # Sign a copy and install it back, keeping mode 0755. sbsign appends a PE
+    # signature table (~2.4 KB on this kernel); the deployed
+    # /boot/ostree/<csum>/vmlinuz-<kver> is a byte-for-byte copy of this file
+    # (verified: identical sha256), which is what carries the signature to the
+    # bootloader. dracut's initramfs does not embed the kernel image, so signing
+    # after the kernel phase is equivalent to signing before its dracut run.
+    install -m0755 "${VMLINUZ}" "${VMLINUZ}.unsigned"
+    sbsign --key "${SB_KEY}" --cert "${SB_CERT}" \
+        --output "${VMLINUZ}.signed" "${VMLINUZ}.unsigned"
+    install -m0755 "${VMLINUZ}.signed" "${VMLINUZ}"
+    rm -f "${VMLINUZ}.unsigned" "${VMLINUZ}.signed"
+    if command -v restorecon >/dev/null 2>&1; then
+        restorecon "${VMLINUZ}" 2>/dev/null || true
+    fi
+
+    # The signature is the whole point of this phase, so verify the artifact
+    # that will ship rather than the sbsign exit code alone.
+    if ! sbverify --cert "${SB_CERT}" "${VMLINUZ}" >/dev/null 2>&1; then
+        printf 'Secure Boot: %s does not verify against %s -- refusing to ship it\n' \
+            "${VMLINUZ}" "${SB_CERT}" >&2
+        sbverify --list "${VMLINUZ}" 2>&1 | head -n 20 >&2
+        exit 1
+    fi
+fi
+
+# DER twin of the same certificate, which is what mokutil imports (the PEM is
+# not accepted) and what hurunagus-enroll-secure-boot-key reads.
+openssl x509 -in "${SB_CERT}" -outform DER -out "${SB_CERT_DER}"
+chmod 0644 "${SB_CERT_DER}"
+
+# sbsigntools stays installed on purpose: /usr is read-only on a booted host, so
+# sbverify could not be added later, and it is the only way for someone on the
+# machine to check what the deployed kernel is actually signed with.
+echo "kernel signed: ${VMLINUZ}"
+sbverify --list "${VMLINUZ}" | sed 's/^/  /'
+printf 'certificate: %s\n' "$(openssl x509 -in "${SB_CERT}" -noout -subject | sed 's/^subject=//')"
+printf 'sha256 fingerprint: %s\n' "$(openssl x509 -in "${SB_CERT}" -noout -fingerprint -sha256 | cut -d= -f2)"
+echo "enroll it on a host with: hurunagus-enroll-secure-boot-key (ujust enroll-hurunagus-kernel-key)"
+echo "::endgroup::"
+}
+
 phase_fresh() {
 # ---------------------------------------------------------------------------
 # Volatile tail: the Omedora COPR mutates between builds of the same commit
@@ -756,10 +889,11 @@ echo "::endgroup::"
 case "$PHASE" in
   base) phase_base ;;
   kernel) phase_kernel ;;
+  sign) phase_sign ;;
   fresh) phase_fresh ;;
-  all) phase_base; phase_kernel; phase_fresh ;;
+  all) phase_base; phase_kernel; phase_sign; phase_fresh ;;
   *)
-    echo "build.sh: unknown phase '${PHASE}' (expected base|kernel|fresh|all)" >&2
+    echo "build.sh: unknown phase '${PHASE}' (expected base|kernel|sign|fresh|all)" >&2
     exit 1
     ;;
 esac

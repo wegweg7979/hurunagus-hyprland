@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Enroll the hurunagus kernel-signing certificate as a Machine Owner Key (MOK).
+#
+# Why this exists: the kernel this image ships (kernel-cachyos) is signed with
+# the hurunagus key instead of Fedora's, and firmware Secure Boot only boots a
+# kernel whose signature it can verify against a key it trusts (the firmware db
+# or the shim MOK list). Fedora does not sign for third parties, so the public
+# half of our key ships in the image and is enrolled once per machine.
+#
+# Secure Boot is OPTIONAL on this image -- if you leave it off in firmware, you
+# can ignore this command entirely. To actually turn it on:
+#
+#   1. run this command (firmware Secure Boot may still be off)
+#   2. reboot: the blue MokManager screen appears -- choose "Enroll MOK",
+#      "Continue", and type the password you set below
+#   3. turn on Secure Boot in firmware setup
+#
+# Afterwards: `mokutil --sb-state` reports whether Secure Boot is enabled, and
+# `mokutil --list-enrolled` lists this key next to the firmware's own.
+set -euo pipefail
+
+SB_CERT_PEM="/usr/share/hurunagus/secureboot/hurunagus-kernel.pem"
+SB_CERT_DER="/usr/share/hurunagus/secureboot/hurunagus-kernel.der"
+SB_CERT_CN="hurunagus kernel signing"
+
+if [[ ! -f "${SB_CERT_DER}" ]]; then
+    printf '%s is missing: this image was built with SB_SIGNING=off, so its kernel is unsigned and there is nothing to enroll.\n' \
+        "${SB_CERT_DER}" >&2
+    exit 1
+fi
+
+if mokutil --list-enrolled 2>/dev/null | grep -q "${SB_CERT_CN}"; then
+    echo "The hurunagus kernel signing key is already enrolled:"
+    mokutil --list-enrolled | grep -C1 -- "${SB_CERT_CN}" | head -n 6
+    echo "Nothing to do -- Secure Boot can be enabled in firmware."
+    exit 0
+fi
+
+echo "Staging the hurunagus kernel signing key for enrollment."
+printf '  certificate : %s\n' "${SB_CERT_DER}"
+printf '  subject     : %s\n' "$(openssl x509 -in "${SB_CERT_PEM}" -noout -subject | sed 's/^subject=//')"
+printf '  fingerprint : %s\n' "$(openssl x509 -in "${SB_CERT_PEM}" -noout -fingerprint -sha256 | cut -d= -f2)"
+echo
+echo "You will be asked for a one-time password. You must retype it in the blue"
+echo "MokManager screen at the next reboot, so pick something short and typeable"
+echo "(there is no keyboard layout beyond QWERTY there)."
+echo
+
+read -rsp "Password for this enrollment: " SB_PASSWORD
+echo
+read -rsp "Repeat password: " SB_PASSWORD_CONFIRM
+echo
+
+if [[ -z "${SB_PASSWORD}" || "${SB_PASSWORD}" != "${SB_PASSWORD_CONFIRM}" ]]; then
+    echo "Passwords were empty or did not match; nothing was staged." >&2
+    exit 1
+fi
+
+# Never let the MokManager prompt time out before it is answered: the request
+# has to survive the reboot instead of silently expiring.
+sudo mokutil --timeout -1
+printf '%s\n%s\n' "${SB_PASSWORD}" "${SB_PASSWORD_CONFIRM}" | sudo mokutil --import "${SB_CERT_DER}"
+unset SB_PASSWORD SB_PASSWORD_CONFIRM
+
+echo
+echo "Staged. At the next reboot, in the blue MokManager screen:"
+echo "  Enroll MOK -> Continue -> enter that password -> reboot"
+echo "Then enable Secure Boot in firmware setup. Changing your mind is safe:"
+echo "disable it in firmware again and the host boots as it does today."
