@@ -18,14 +18,8 @@ The best of Linux in one distro.
   scrub of the btrfs filesystem.
 - CachyOS kernel — from the official CachyOS Fedora port: BORE CPU scheduler,
   1000 Hz tick, full preemption, BFQ/Kyber I/O schedulers, x86_64-v3. A matching
-  initramfs is generated for it, and it is signed with this image's own key
-  (Fedora signs no third party, and the CachyOS port ships no signed flavour), so
-  Secure Boot can be turned on: one MOK enrollment per machine with
-  `ujust enroll-hurunagus-kernel-key`, reboot and enroll at the blue MokManager
-  screen, then enable Secure Boot in firmware (`mokutil --sb-state` confirms it;
-  the certificate and key-rotation notes live in
-  `/usr/share/hurunagus/secureboot/`). Off by default, and nothing here requires
-  it.
+  initramfs is generated for it, and it is signed.
+- Secure boot compatible. 
 - Omarchy Agent skills modified to fit immutable fedora.  
 - iCloud Photos, iCloud drive, iCloud calendar ready to log in.
 - Google drive ready to login
