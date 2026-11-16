@@ -306,8 +306,9 @@ source = "skip"
 reason = "Pacman database query tool; nonsensical on Fedora (dnf-query is the analog and packagers don't typically need it)."
 
 [gnome-themes-extra]
-source = "skip"
-reason = "Fedora's GNOME theming differs; adw-gtk3-theme is the modern equivalent for Adwaita-like styling. Skip until omedora has a GTK theming story on Fedora."
+source = "dnf"
+names = ["adw-gtk3-theme"]
+reason = "Arch's gnome-themes-extra is the Adwaita GTK3 sheets (plus GNOME icon themes); Fedora has no such package, and adw-gtk3-theme is the modern equivalent the ecosystem uses — the libadwaita look ported to GTK 3, one sheet per mode. Baking it lets omarchy-theme-set-gnome name a GTK3 theme whose dark variant GTK 3.24 can actually resolve, instead of being left on plain Adwaita (Fedora main + updates carry 6.5-1.fc45). It ships gtk-3.0 files only, so GTK4 is unaffected: GTK4 follows color-scheme."
 
 [inetutils]
 source = "skip"
