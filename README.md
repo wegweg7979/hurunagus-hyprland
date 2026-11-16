@@ -47,17 +47,9 @@ This image ships **Hyprland** with **Omarchy** dotfiles, based on the omadora
 variant of Omarchy. Highlights:
 
 - **Hyprland** as the window manager.
-- **Omarchy** dotfiles under `~/.config/hypr` and `~/.config/omarchy` for the
-  look & feel, keybindings and first-boot provisioning.
+- **Omarchy** ported to fedora (Omedora)
 - **Omedora** forked and modified to function correctly on immutable fedora (rpm-ostree / bootc).
-- **Tiling by default** — nothing forces a global layout, so new workspaces tile
-  and each workspace keeps whatever `Super + L` cycles it to: tiling, scrolling,
-  or floating. (niri-like scrolling is still one keystroke away.)
-- **Wallpapers imported** from the original project into
-  `~/.local/share/backgrounds` and `/usr/share/backgrounds/hurunagus`.
 - **SDDM user picker** — the Omarchy login theme with added user picker for multi-user systems.
-- **Flatpak list imported** so all of the favourite apps are installed on first
-  boot. They will also be re-installed at boot if the user has uninstalled them. 
 - **Btrfs maintenance** via `btrfsmaintenance`: a monthly checksum-verifying
   scrub of the btrfs filesystem.
 - **CachyOS kernel** — the stock Fedora kernel is replaced at build time with
@@ -70,20 +62,7 @@ variant of Omarchy. Highlights:
 
 ## Install
 
-The safe way in is [`hurubase`](https://github.com/wegweg7979/hurunagus-rebase).
-It resolves and digest-pins the address, reads your container signature policy to
-decide whether the signed image works directly or the two-step below is needed,
-refuses a staged deployment / low disk / an address that will not resolve, and
-after the reboot adopts this image's `/etc/skel` payload into your `$HOME` and
-fixes a session record that still points at the old desktop — asking before each
-change.
 
-```sh
-./hurubase ghcr.io/wegweg7979/hurunagus-hyprland:latest        # preflight and plan
-sudo ./hurubase ghcr.io/wegweg7979/hurunagus-hyprland:latest   # apply
-```
-
-If you prefer to do it yourself, `hurubase` does exactly this:
 
 - First rebase to the unsigned image, to get the proper signing keys and policies
   installed:
