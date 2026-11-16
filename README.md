@@ -18,9 +18,14 @@ The best of Linux in one distro.
   scrub of the btrfs filesystem.
 - CachyOS kernel — from the official CachyOS Fedora port: BORE CPU scheduler,
   1000 Hz tick, full preemption, BFQ/Kyber I/O schedulers, x86_64-v3. A matching
-  initramfs is generated for it, and it is signed with this image's own key, so
-  Secure Boot can be turned on after one MOK enrollment per machine. Off by
-  default, and nothing here requires it.
+  initramfs is generated for it, and it is signed with this image's own key
+  (Fedora signs no third party, and the CachyOS port ships no signed flavour), so
+  Secure Boot can be turned on: one MOK enrollment per machine with
+  `ujust enroll-hurunagus-kernel-key`, reboot and enroll at the blue MokManager
+  screen, then enable Secure Boot in firmware (`mokutil --sb-state` confirms it;
+  the certificate and key-rotation notes live in
+  `/usr/share/hurunagus/secureboot/`). Off by default, and nothing here requires
+  it.
 - Omarchy Agent skills modified to fit immutable fedora.  
 - iCloud Photos, iCloud drive, iCloud calendar ready to log in.
 - Google drive ready to login
@@ -73,22 +78,6 @@ automatically from `/etc/skel` and do not need this step.
 
 <img width="512" height="512" alt="Gemini_Generated_Image_rokat0rokat0roka" src="https://github.com/user-attachments/assets/d0bfbdca-0e15-4e00-a0f9-16cf8704a825" />
 
-
-## Secure Boot (optional)
-
-The kernel is signed with a key this image owns (Fedora signs no third party, and
-the CachyOS port ships no signed flavour). Turning Secure Boot on is one
-enrollment per machine, because firmware only trusts keys it has been told about:
-
-```sh
-ujust enroll-hurunagus-kernel-key   # set a one-time password, then reboot
-# blue MokManager screen -> Enroll MOK -> that password
-# then enable Secure Boot in firmware setup
-```
-
-`mokutil --sb-state` reports the result afterwards. The certificate and the
-key-rotation notes live in `/usr/share/hurunagus/secureboot/`. The inherited
-`ujust enroll-secure-boot-key` enrolls Universal Blue's key, not this one.
 
 ## References
 
