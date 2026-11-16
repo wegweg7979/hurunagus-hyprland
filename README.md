@@ -10,6 +10,23 @@ one place, from a single repo. Automatic builds once a week on a Tuesday, silent
 Stability of Fedora. Immutability and build process of Silverblue. Omarchy bling. CachyOs performance. Batteries included from Universal Blue.
 The best of Linux in one distro. 
 
+
+- Hyprland as the window manager.
+- Omarchy ported to fedora (Omedora)
+- Omedora forked and modified to function correctly on immutable fedora (rpm-ostree / bootc).
+- SDDM user picker — the Omarchy login theme with added user picker for multi-user systems.
+- Btrfs maintenance via `btrfsmaintenance`: a monthly checksum-verifying
+  scrub of the btrfs filesystem.
+- CachyOS kernel** — the stock Fedora kernel is replaced at build time with
+  `kernel-cachyos` from the official CachyOS Fedora port: BORE CPU scheduler,
+  1000 Hz tick, full preemption, BFQ/Kyber I/O schedulers, x86_64-v3. A matching
+  initramfs is generated for it. The kernel is unsigned, so Secure Boot would
+  need a MOK enrolled by hand.
+- Icloud Photos, Icloud drive, Icloud calendar set up & ready to log in.
+- Google drive ready to login
+- Hardware accelerated video fully set up for intel gpu
+- Pre-install list of flatpak software.
+
 Dont use this — make your own, it is not too difficult and quite fun.
 https://github.com/ublue-os/image-template
 
@@ -39,51 +56,6 @@ exactly YOUR needs.
   systemctl reboot
   ```
 
-## Desktop
-
-This image ships **Hyprland** with **Omarchy** dotfiles, based on the omadora
-variant of Omarchy. Highlights:
-
-- Hyprland as the window manager.
-- Omarchy ported to fedora (Omedora)
-- Omedora forked and modified to function correctly on immutable fedora (rpm-ostree / bootc).
-- SDDM user picker — the Omarchy login theme with added user picker for multi-user systems.
-- Btrfs maintenance via `btrfsmaintenance`: a monthly checksum-verifying
-  scrub of the btrfs filesystem.
-- CachyOS kernel** — the stock Fedora kernel is replaced at build time with
-  `kernel-cachyos` from the official CachyOS Fedora port: BORE CPU scheduler,
-  1000 Hz tick, full preemption, BFQ/Kyber I/O schedulers, x86_64-v3. A matching
-  initramfs is generated for it. The kernel is unsigned, so Secure Boot would
-  need a MOK enrolled by hand.
-- Icloud Photos, Icloud drive, Icloud calendar set up & ready to log in.
-- Google drive ready to login
-- Hardware accelerated video fully set up for intel gpu
-- Pre-install list of flatpak software.
-
-
-## Install
-
-
-
-- First rebase to the unsigned image, to get the proper signing keys and policies
-  installed:
-  ```sh
-  rpm-ostree rebase ostree-unverified-registry:ghcr.io/wegweg7979/hurunagus-hyprland:latest
-  ```
-- Reboot to complete the rebase:
-  ```sh
-  systemctl reboot
-  ```
-- Then rebase to the signed image, like so:
-  ```sh
-  rpm-ostree rebase ostree-image-signed:docker://ghcr.io/wegweg7979/hurunagus-hyprland:latest
-  ```
-- Reboot again to complete the installation:
-  ```sh
-  systemctl reboot
-  ```
-
-### If you're rebasing from a *different* atomic distro
 
 Your existing `$HOME` is preserved across the rebase — atomic rebases never touch
 it. That means the Omarchy defaults this image ships in `/etc/skel` (dotfiles for
@@ -98,11 +70,6 @@ omarchy-reinstall-configs
 New users (fresh installs, or accounts created after the rebase) get these
 automatically from `/etc/skel` and do not need this step.
 
-Re-running [`hurubase`](https://github.com/wegweg7979/hurunagus-rebase) with the
-same image address does this adoption for you, along with resetting a session
-record that still names the other distro's session (which is what leaves you on a
-black screen or bouncing back to the greeter) — each change offered separately,
-with backups.
 
 <img width="512" height="512" alt="Gemini_Generated_Image_rokat0rokat0roka" src="https://github.com/user-attachments/assets/d0bfbdca-0e15-4e00-a0f9-16cf8704a825" />
 
