@@ -27,7 +27,7 @@ The best of Linux in one distro.
 - Hardware accelerated video fully set up for intel gpu
 - Pre-install list of flatpak software.
 
-Dont use this — make your own, it is not too difficult and quite fun.
+Dont use this —you can make your own, it is not too difficult and quite fun.
 https://github.com/ublue-os/image-template
 
 Be aware installed apps and features will be added or removed as I see fit at
