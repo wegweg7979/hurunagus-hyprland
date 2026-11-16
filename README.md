@@ -17,12 +17,11 @@ The best of Linux in one distro.
 - SDDM user picker — the Omarchy login theme with added user picker for multi-user systems.
 - Btrfs maintenance via `btrfsmaintenance`: a monthly checksum-verifying
   scrub of the btrfs filesystem.
-- CachyOS kernel** — the stock Fedora kernel is replaced at build time with
-  `kernel-cachyos` from the official CachyOS Fedora port: BORE CPU scheduler,
+- CachyOS kernel — from the official CachyOS Fedora port: BORE CPU scheduler,
   1000 Hz tick, full preemption, BFQ/Kyber I/O schedulers, x86_64-v3. A matching
   initramfs is generated for it. The kernel is unsigned, so Secure Boot would
   need a MOK enrolled by hand.
-- Icloud Photos, Icloud drive, Icloud calendar set up & ready to log in.
+- iCloud Photos, iCloud drive, iCloud calendar ready to log in.
 - Google drive ready to login
 - Hardware accelerated video fully set up for intel gpu
 - Pre-install list of flatpak software.
