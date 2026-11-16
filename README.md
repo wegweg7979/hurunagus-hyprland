@@ -20,6 +20,7 @@ The best of Linux in one distro.
   1000 Hz tick, full preemption, BFQ/Kyber I/O schedulers, x86_64-v3. A matching
   initramfs is generated for it. The kernel is unsigned, so Secure Boot would
   need a MOK enrolled by hand.
+- Omarchy Agent skills modified to fit immutable fedora.  
 - iCloud Photos, iCloud drive, iCloud calendar ready to log in.
 - Google drive ready to login
 - Hardware accelerated video fully set up for intel gpu
