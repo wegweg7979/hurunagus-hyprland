@@ -20,8 +20,6 @@ system suitable for multimedia and modern computing in 2026. I need my computer 
 for more than one machine, you should really take the time to make your own for
 exactly YOUR needs.
 
-rebase an existing atomic Fedora installation — the safe, scripted path is
-[`hurubase`](#install), and these are the same steps by hand:
 
 - First rebase to the unsigned image, to get the proper signing keys and policies
   installed:
@@ -46,18 +44,21 @@ rebase an existing atomic Fedora installation — the safe, scripted path is
 This image ships **Hyprland** with **Omarchy** dotfiles, based on the omadora
 variant of Omarchy. Highlights:
 
-- **Hyprland** as the window manager.
-- **Omarchy** ported to fedora (Omedora)
-- **Omedora** forked and modified to function correctly on immutable fedora (rpm-ostree / bootc).
-- **SDDM user picker** — the Omarchy login theme with added user picker for multi-user systems.
-- **Btrfs maintenance** via `btrfsmaintenance`: a monthly checksum-verifying
+- Hyprland as the window manager.
+- Omarchy ported to fedora (Omedora)
+- Omedora forked and modified to function correctly on immutable fedora (rpm-ostree / bootc).
+- SDDM user picker — the Omarchy login theme with added user picker for multi-user systems.
+- Btrfs maintenance via `btrfsmaintenance`: a monthly checksum-verifying
   scrub of the btrfs filesystem.
-- **CachyOS kernel** — the stock Fedora kernel is replaced at build time with
+- CachyOS kernel** — the stock Fedora kernel is replaced at build time with
   `kernel-cachyos` from the official CachyOS Fedora port: BORE CPU scheduler,
   1000 Hz tick, full preemption, BFQ/Kyber I/O schedulers, x86_64-v3. A matching
   initramfs is generated for it. The kernel is unsigned, so Secure Boot would
   need a MOK enrolled by hand.
-
+- Icloud Photos, Icloud drive, Icloud calendar set up & ready to log in.
+- Google drive ready to login
+- Hardware accelerated video fully set up for intel gpu
+- Pre-install list of flatpak software.
 
 
 ## Install
