@@ -12,17 +12,16 @@ The best of Linux in one distro.
 
 - Omarchy ported to Fedora (Omedora).
 - Omedora forked and modified to function correctly on immutable Fedora (rpm-ostree / bootc).
-- SDDM user picker — the Omarchy login theme with added user picker for multi-user systems.
-- Btrfs maintenance - monthly checksum-verifying
-  scrub of the btrfs filesystem.
 - CachyOS kernel — from the official CachyOS Fedora port: BORE CPU scheduler,
   1000 Hz tick, full preemption, BFQ/Kyber I/O schedulers, x86_64-v3 only.
 - Secure boot compatible (Enroll the key).
-- Omarchy Agent skills modified to fit immutable fedora.  
+- Omarchy Agent skills modified to fit immutable fedora.
+- SDDM user picker — the Omarchy login theme with added user picker for multi-user systems.
 - iCloud Photos, iCloud drive, iCloud calendar ready to log in.
 - Google drive ready to login.
 - Pre-install list of flatpak software.
 - Hermes agent and opencode ready.
+- Btrfs maintenance - monthly checking.
 
 Dont use this —you can make your own, it is not too difficult and quite fun.
 https://github.com/ublue-os/image-template
