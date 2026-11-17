@@ -5,26 +5,24 @@ Declarative, atomic, immutable Linux system. Fedora Silverblue, Omarchy desktop,
 apps I need preinstalled. It is fedora, but it is omarchy, but its Cachyos....
 
 Reason to exist: making all my computers run identical systems, administered in
-one place, from a single repo. Automatic builds once a week on a Tuesday, silently applied in the background and applied on reboot.
-Stability of Fedora. Immutability and build process of Silverblue. Omarchy bling. CachyOs performance. Batteries included from Universal Blue.
+one place, from a single config. Automatic builds once a week, silently applied in the background and ready on reboot.
+Stability of Fedora. Immutability and build process of Silverblue. Omarchy bling. Cachyos performance. Batteries included from Universal Blue.
 The best of Linux in one distro. 
 
 
-- Hyprland as the window manager.
-- Omarchy ported to fedora (Omedora)
-- Omedora forked and modified to function correctly on immutable fedora (rpm-ostree / bootc).
+- Omarchy ported to Fedora (Omedora).
+- Omedora forked and modified to function correctly on immutable Fedora (rpm-ostree / bootc).
 - SDDM user picker — the Omarchy login theme with added user picker for multi-user systems.
-- Btrfs maintenance via `btrfsmaintenance`: a monthly checksum-verifying
+- Btrfs maintenance - monthly checksum-verifying
   scrub of the btrfs filesystem.
 - CachyOS kernel — from the official CachyOS Fedora port: BORE CPU scheduler,
-  1000 Hz tick, full preemption, BFQ/Kyber I/O schedulers, x86_64-v3. A matching
-  initramfs is generated for it, and it is signed.
-- Secure boot compatible. 
+  1000 Hz tick, full preemption, BFQ/Kyber I/O schedulers, x86_64-v3 only.
+- Secure boot compatible (Enroll the key).
 - Omarchy Agent skills modified to fit immutable fedora.  
 - iCloud Photos, iCloud drive, iCloud calendar ready to log in.
-- Google drive ready to login
-- Hardware accelerated video fully set up for intel gpu
+- Google drive ready to login.
 - Pre-install list of flatpak software.
+- Hermes agent and opencode ready.
 
 Dont use this —you can make your own, it is not too difficult and quite fun.
 https://github.com/ublue-os/image-template
