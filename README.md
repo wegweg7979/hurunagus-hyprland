@@ -13,7 +13,7 @@ The best of Linux in one distro.
 - Omarchy ported to Fedora (Omedora).
 - Omedora forked and modified to function correctly on immutable Fedora (rpm-ostree / bootc).
 - CachyOS kernel — from the official CachyOS Fedora port: BORE CPU scheduler,
-  1000 Hz tick, full preemption, BFQ/Kyber I/O schedulers, x86_64-v3 only.
+  1000 Hz tick, x86_64-v3 only.
 - Secure boot compatible (Enroll the key).
 - Omarchy Agent skills modified to fit immutable fedora.
 - SDDM user picker — the Omarchy login theme with added user picker for multi-user systems.
