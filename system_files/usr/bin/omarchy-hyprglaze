@@ -1,0 +1,204 @@
+#!/bin/bash
+
+# omarchy:summary=Shader wallpaper (hyprglaze): turn it on or off
+# omarchy:args=<on|off|toggle|status>
+# omarchy:examples=omarchy hyprglaze on | omarchy hyprglaze off | omarchy hyprglaze status
+
+# hyprglaze renders a GLSL shader wallpaper on the background layer and reacts to
+# windows, the cursor and music. It is NOT a wallpaper replacement: it draws on
+# wlr-layer-shell above Omarchy's own background surface, which keeps rendering
+# underneath untouched. That is what makes turning it off clean -- stopping the
+# daemon reverts the desktop instantly, byte-for-byte, with nothing to restore.
+#
+# The one thing a stop does NOT undo on its own: at startup hyprglaze installs a
+# small Lua watcher into the compositor's Lua VM (that is how it gets window
+# geometry mid-drag). Killing the daemon leaves that watcher ticking -- a 16 ms
+# timer and a ~2 s heartbeat -- because only a config reload recreates the Lua
+# state. Measured on Hyprland 0.56.2: with the daemon gone the compositor still
+# emitted hg:* events, and after `hyprctl reload` it emitted none. So `off` stops
+# the instances AND reloads, and the disable path is symmetric with the enable
+# path. A daemon started after a reload re-installs the watcher by itself, which
+# is why `on` needs no reload.
+#
+# Units are the ones the hyprglaze package ships: hyprglaze@<connector>.service,
+# one instance per monitor, WantedBy=graphical-session.target. That target IS
+# reached on Hurunagus (uwsm starts the session), so the units really do start at
+# login -- unlike the direct-start Hyprland setups the upstream README warns
+# about. Connector names are per-machine, so `on` enables the monitors that are
+# connected right now and leaves the ones that are not to be added later.
+#
+# Env overrides (mainly for testing):
+#   HYPRGLAZE_UNIT      unit prefix        (default hyprglaze@)
+#   HYPRGLAZE_MONITORS  monitor list       (default: hyprctl -j monitors)
+#   HYPRGLAZE_SYSTEMCTL systemctl          (default systemctl)
+#   HYPRGLAZE_HYPRCTL   hyprctl            (default hyprctl)
+
+set -euo pipefail
+
+UNIT="${HYPRGLAZE_UNIT:-hyprglaze@}"
+SYSTEMCTL="${HYPRGLAZE_SYSTEMCTL:-systemctl}"
+HYPRCTL="${HYPRGLAZE_HYPRCTL:-hyprctl}"
+action="${1:-status}"
+
+usage() {
+  cat <<'EOF'
+Usage: omarchy-hyprglaze <on|off|toggle|status>
+
+  on      Start (and enable at login) one hyprglaze instance per connected
+          monitor.
+  off     Stop every instance, disable them, then reload the Hyprland config so
+          the Lua watcher the daemon injects is dropped with the Lua state.
+          The Omarchy wallpaper is untouched and reappears immediately.
+  toggle  on if nothing is running, off if anything is.
+  status  Show the instances and whether the compositor has a hyprglaze layer.
+EOF
+}
+
+if ((EUID == 0)); then
+  echo "Error: This script should not be run as root" >&2
+  exit 1
+fi
+
+case "$action" in
+  -h | --help | help)
+    usage
+    exit 0
+    ;;
+  on | off | toggle | status) ;;
+  *)
+    echo "${0##*/}: unknown action: $action" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
+
+if ! command -v "$SYSTEMCTL" >/dev/null 2>&1; then
+  echo "Error: $SYSTEMCTL not found" >&2
+  exit 1
+fi
+
+# Instances systemd actually knows about (running or failed), not the enable
+# symlinks: `list-units --all` is the only view that stays correct when a monitor
+# was unplugged and its unit is stuck restarting.
+instances() {
+  "$SYSTEMCTL" --user list-units --all --type=service --no-legend --plain \
+    "${UNIT}*" 2>/dev/null | awk '{print $1}' | sed 's/\.service$//' | sort -u
+}
+
+# Every non-disabled output the compositor currently has. A monitor that is off
+# (or gone) must not get an instance: hyprglaze exits non-zero when its pinned
+# output disappears, and the unit's retry loop would just spin.
+monitors() {
+  if [[ -n ${HYPRGLAZE_MONITORS:-} ]]; then
+    printf '%s\n' $HYPRGLAZE_MONITORS
+    return
+  fi
+  if ! command -v "$HYPRCTL" >/dev/null 2>&1; then
+    echo "Error: $HYPRCTL not found (run this inside the Hyprland session)" >&2
+    exit 1
+  fi
+  "$HYPRCTL" -j monitors | jq -r '.[] | select(.disabled == false) | .name'
+}
+
+package_present() {
+  "$SYSTEMCTL" --user list-unit-files "${UNIT}*.service" --no-legend 2>/dev/null | grep -q .
+}
+
+do_on() {
+  if ! package_present; then
+    echo "Error: no ${UNIT}<monitor>.service units installed -- is the hyprglaze package present?" >&2
+    exit 1
+  fi
+  local mon started=0
+  while read -r mon; do
+    [[ -z $mon ]] && continue
+    if "$SYSTEMCTL" --user is-active --quiet "${UNIT}${mon}.service"; then
+      echo "already running: ${UNIT}${mon}.service"
+      continue
+    fi
+    "$SYSTEMCTL" --user enable --now "${UNIT}${mon}.service"
+    echo "started: ${UNIT}${mon}.service"
+    started=$((started + 1))
+  done < <(monitors)
+
+  if ((started == 0)); then
+    echo "hyprglaze: nothing to start (already running on every connected monitor)"
+  else
+    echo "hyprglaze: $started instance(s) up. Off: ${0##*/} off"
+  fi
+}
+
+# Does the compositor currently show a hyprglaze layer surface? A cheap, direct
+# read of the thing the user cares about, rather than inferring it from units.
+layer_present() {
+  command -v "$HYPRCTL" >/dev/null 2>&1 || return 1
+  "$HYPRCTL" layers 2>/dev/null | grep -q 'namespace: hyprglaze'
+}
+
+do_off() {
+  local found=0 name
+  while read -r name; do
+    [[ -z $name ]] && continue
+    found=$((found + 1))
+    "$SYSTEMCTL" --user disable --now "$name.service" || true
+    echo "stopped: $name.service"
+  done < <(instances)
+
+  if ((found == 0)); then
+    echo "hyprglaze: nothing running (no reload: nothing to undo)"
+    return
+  fi
+
+  # Drop the injected Lua watcher. hyprglaze reinstalls it itself after the next
+  # reload, so this is safe to run unconditionally. Skipped when there was no
+  # instance to stop, so a second `off` does not remap the desktop for nothing.
+  if command -v omarchy-restart-hyprctl >/dev/null 2>&1; then
+    omarchy-restart-hyprctl >/dev/null 2>&1 || true
+    echo "reloaded the Hyprland config (omarchy-restart-hyprctl)"
+  elif command -v "$HYPRCTL" >/dev/null 2>&1; then
+    "$HYPRCTL" reload >/dev/null 2>&1 || true
+    echo "reloaded the Hyprland config"
+  fi
+
+  if layer_present; then
+    echo "warning: a hyprglaze layer surface is still mapped" >&2
+    exit 1
+  fi
+  echo "hyprglaze off: the Omarchy wallpaper is back (nothing to restore)."
+}
+
+do_status() {
+  local list
+  list="$(instances)"
+  if [[ -z $list ]]; then
+    echo "hyprglaze: off (no instances)"
+  else
+    echo "hyprglaze: instances"
+    while read -r name; do
+      [[ -z $name ]] && continue
+      printf '  %s  %s\n' "$name" \
+        "$("$SYSTEMCTL" --user is-active "$name.service" 2>/dev/null || true)"
+    done <<<"$list"
+  fi
+
+  if command -v "$HYPRCTL" >/dev/null 2>&1; then
+    if "$HYPRCTL" layers 2>/dev/null | grep -q 'namespace: hyprglaze'; then
+      echo "  compositor: hyprglaze layer surface present"
+    else
+      echo "  compositor: no hyprglaze layer surface"
+    fi
+  fi
+}
+
+case "$action" in
+  on) do_on ;;
+  off) do_off ;;
+  status) do_status ;;
+  toggle)
+    if [[ -n $(instances) ]]; then
+      do_off
+    else
+      do_on
+    fi
+    ;;
+esac

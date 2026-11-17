@@ -264,6 +264,27 @@ dnf5 -y copr disable wegweg7979/icloud-for-omarchy
 echo "icloud-for-omarchy installed: $(rpm -q --qf '%{name}-%{version}-%{release}' icloud-for-omarchy)"
 echo "::endgroup::"
 
+# hyprglaze - the shader wallpaper: GLSL effects on Hyprland's background layer,
+# aware of windows, the cursor and music. NOT ours: upstream is
+# github.com/slastra/hyprglaze (MIT, Arch PKGBUILD, Zig build), so
+# wegweg7979/hyprglaze-rpm holds the spec and this COPR builds it; the repo is
+# enabled only for the install, like the app COPRs above. It needs Hyprland >= 0.55
+# with a Lua config (declared as Requires: hyprland-bin, which Omedora's
+# hyprland-no-session Provides) and Zig 0.17.1 at BUILD time -- Fedora 45's zig is
+# 0.16.0, so the spec pins the official Zig tarball as a second source.
+# Deliberately unguarded: an image that silently ships without the wallpaper is
+# worse than a red build. Nothing starts it by itself: the user switches it on and
+# off with `omarchy hyprglaze on|off` (system_files/usr/bin/omarchy-hyprglaze),
+# which wraps the packaged hyprglaze@<monitor>.service units and reloads Hyprland
+# on the way out so the Lua watcher the daemon injects is dropped with the Lua
+# state.
+echo "::group:: Installing hyprglaze (Hyprland shader wallpaper daemon)"
+dnf5 -y copr enable wegweg7979/hyprglaze
+dnf5 install -y hyprglaze
+dnf5 -y copr disable wegweg7979/hyprglaze
+echo "hyprglaze installed: $(rpm -q --qf '%{name}-%{version}-%{release}' hyprglaze)"
+echo "::endgroup::"
+
 install_packages() {
     local failed=() package required_failed=0
 
