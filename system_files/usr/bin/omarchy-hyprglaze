@@ -104,23 +104,67 @@ package_present() {
   "$SYSTEMCTL" --user list-unit-files "${UNIT}*.service" --no-legend 2>/dev/null | grep -q .
 }
 
+# A unit that "started" is not a unit that is running. `enable --now` returns 0
+# while the daemon can exit a moment later and sit in a restart loop with nothing
+# on screen -- measured on an Intel N100 box, where the template instance asked
+# for a monitor name that did not exist and the wallpaper never appeared, with
+# this command still reporting "started". So: wait for the unit to settle, and
+# when it does not, say why rather than leaving the user staring at a plain
+# desktop.
+unit_active() {
+  "$SYSTEMCTL" --user is-active --quiet "$1"
+}
+
+# Template units restart on failure (StartLimitIntervalSec=0), so give a monitor
+# that is briefly away a moment to come up: 40 x 0.2s.
+wait_for_active() {
+  local unit="$1" i
+  for ((i = 0; i < 40; i++)); do
+    unit_active "$unit" && return 0
+    sleep 0.2
+  done
+  return 1
+}
+
+explain_unit_failure() {
+  local unit="$1" state
+  state="$("$SYSTEMCTL" --user show -p Result -p ExecMainStatus "$unit" 2>/dev/null | tr '\n' ' ')"
+  [[ -n ${state// /} ]] && echo "    unit state: $state"
+  if command -v journalctl >/dev/null 2>&1; then
+    journalctl --user -u "$unit" --no-pager --lines=6 2>/dev/null | tail -6 | sed 's/^/    /'
+  fi
+}
+
 do_on() {
   if ! package_present; then
     echo "Error: no ${UNIT}<monitor>.service units installed -- is the hyprglaze package present?" >&2
     exit 1
   fi
-  local mon started=0
+  local mon started=0 failed=0
   while read -r mon; do
     [[ -z $mon ]] && continue
-    if "$SYSTEMCTL" --user is-active --quiet "${UNIT}${mon}.service"; then
+    if unit_active "${UNIT}${mon}.service"; then
       echo "already running: ${UNIT}${mon}.service"
       continue
     fi
+    # A previous crash leaves the unit failed; clear that so this is a real
+    # attempt rather than a replay of the old state.
+    "$SYSTEMCTL" --user reset-failed "${UNIT}${mon}.service" 2>/dev/null || true
     "$SYSTEMCTL" --user enable --now "${UNIT}${mon}.service"
-    echo "started: ${UNIT}${mon}.service"
-    started=$((started + 1))
+    if wait_for_active "${UNIT}${mon}.service"; then
+      echo "started: ${UNIT}${mon}.service"
+      started=$((started + 1))
+    else
+      echo "FAILED: ${UNIT}${mon}.service is not running" >&2
+      explain_unit_failure "${UNIT}${mon}.service"
+      failed=$((failed + 1))
+    fi
   done < <(monitors)
 
+  if ((failed > 0)); then
+    echo "hyprglaze: $started started, $failed failed -- the unit's own output is above." >&2
+    exit 1
+  fi
   if ((started == 0)); then
     echo "hyprglaze: nothing to start (already running on every connected monitor)"
   else
@@ -141,6 +185,9 @@ do_off() {
     [[ -z $name ]] && continue
     found=$((found + 1))
     "$SYSTEMCTL" --user disable --now "$name.service" || true
+    # Clear any failed/restart-loop state the unit accumulated, so the next
+    # start is a clean attempt and `status` does not keep showing a failure.
+    "$SYSTEMCTL" --user reset-failed "$name.service" 2>/dev/null || true
     echo "stopped: $name.service"
   done < <(instances)
 
