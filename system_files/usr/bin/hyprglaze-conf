@@ -1,0 +1,288 @@
+#!/usr/bin/python3
+"""Read and edit ~/.config/hypr/hyprglaze.toml without rewriting the file.
+
+hyprglaze reads its settings from that one TOML file and hot-reloads it (it
+watches the directory with inotify), so a settings UI only needs to write the
+file. Upstream ships a writer for exactly one key (`hyprglaze --set-theme`); this
+helper covers the rest, and it is deliberately line-oriented: every line it does
+not have to touch is copied byte for byte, so the user's comments, ordering and
+blank lines survive.
+
+NOT a general TOML editor. It understands top-level keys and `[section]` keys,
+which is all hyprglaze's own settings need.
+
+  hyprglaze-conf path                       print the config path that would be used
+  hyprglaze-conf get [--json]               effective settings
+  hyprglaze-conf set <key> <value> [flags]  write one key
+  hyprglaze-conf sections-music             the sections that honour `music`
+
+  set flags:  --section <name>   for `music`: which section to write
+              --all              for `music`: every section that honours it
+
+Exit codes: 0 ok, 1 refused (bad key/value), 2 usage.
+"""
+
+import json
+import os
+import re
+import sys
+import tempfile
+import tomllib
+
+# The sections whose `music` key is actually read, derived from the source at the
+# pinned commit: every effect that calls audio.spawnIfMusic, directly or through
+# the shared spectral helper. starfield and milkdrop read the shared [visualizer]
+# section (effects.zig paramSection), as does visualizer itself. A NEW audio
+# effect upstream would not appear here until this list is extended -- the cost is
+# a section that `set music --all` misses, not a broken file.
+MUSIC_SECTIONS = [
+    "amorphous", "coral", "crystal", "fluid", "flux", "fur", "glitch", "ivy",
+    "laser", "moire", "swarm", "voltaic", "weft", "whorl", "windowglow",
+    "visualizer",
+]
+
+# Effect -> the section its params come from (effects.zig paramSection).
+SHARED_SECTIONS = {"starfield": "visualizer", "milkdrop": "visualizer", "ai-buddy": "buddy"}
+
+STRING_KEYS = ("effect", "theme", "shader")
+BOOL_KEYS = ("music",)
+
+
+def config_path():
+    """The path hyprglaze itself would use, in its own order."""
+    xdg = os.environ.get("XDG_CONFIG_HOME")
+    if xdg:
+        p = os.path.join(xdg, "hypr", "hyprglaze.toml")
+        if os.path.exists(p):
+            return p
+    home = os.environ.get("HOME")
+    if not home:
+        sys.exit("hyprglaze-conf: no HOME in the environment")
+    return os.path.join(home, ".config", "hypr", "hyprglaze.toml")
+
+
+def load(path):
+    if not os.path.isfile(path):
+        return {}
+    with open(path, "rb") as fh:
+        try:
+            return tomllib.load(fh)
+        except tomllib.TOMLDecodeError as err:
+            sys.exit(f"hyprglaze-conf: {path} is not valid TOML: {err}")
+
+
+def cmd_path():
+    print(config_path())
+
+
+def cmd_get(as_json):
+    path = config_path()
+    cfg = load(path)
+    effect = cfg.get("effect") or "fluid"
+    section = SHARED_SECTIONS.get(effect, effect)
+    sec = cfg.get(section) if isinstance(cfg.get(section), dict) else {}
+    data = {
+        "path": path,
+        "exists": os.path.isfile(path),
+        "effect": effect,
+        "theme": cfg.get("theme"),
+        "output": cfg.get("output"),
+        "section": section,
+        # null means "not set in the file": the daemon's own default is true.
+        "music": sec.get("music"),
+        "music_sections": MUSIC_SECTIONS,
+    }
+    if as_json:
+        print(json.dumps(data))
+        return
+    print(f"config:  {data['path']}{'' if data['exists'] else '  (absent: defaults are in use)'}")
+    print(f"effect:  {data['effect']}")
+    print(f"theme:   {data['theme'] if data['theme'] is not None else '(default)'}")
+    print(f"music:   {'on' if data['music'] is not False else 'off'}  [{section}]")
+
+
+def cmd_sections_music():
+    print("\n".join(MUSIC_SECTIONS))
+
+
+def literal(key, value):
+    if key in BOOL_KEYS:
+        v = value.strip().lower()
+        if v in ("on", "true", "1", "yes"):
+            return "true"
+        if v in ("off", "false", "0", "no"):
+            return "false"
+        sys.exit(f"hyprglaze-conf: {key} takes on/off, not '{value}'")
+    if key not in STRING_KEYS:
+        sys.exit(f"hyprglaze-conf: refusing to write unknown key '{key}'")
+    if any(c in value for c in ('"', "\\", "\n", "\r")):
+        sys.exit(f"hyprglaze-conf: refusing to write {key} with quotes/escapes in it")
+    return json.dumps(value)
+
+
+def key_line_re(key):
+    # A key assignment, and not a commented one: upstream's own writer is this
+    # strict for `theme`, and the same rule keeps `# effect = ...` examples safe.
+    return re.compile(r"^\s*" + re.escape(key) + r"\s*=")
+
+
+def new_line_for(existing, key, value, newline):
+    """The replacement line, keeping any trailing inline comment the user wrote."""
+    trailing = ""
+    if existing is not None:
+        m = re.match(
+            r"^\s*" + re.escape(key) + r"""\s*=\s*(?:"(?:[^"\\]|\\.)*"|'[^']*'|[^\s#]+)(.*)$""",
+            existing,
+        )
+        if m and m.group(1).strip().startswith("#"):
+            trailing = "  " + m.group(1).strip()
+    return f"{key} = {value}{trailing}{newline}"
+
+
+def section_bounds(lines, name):
+    """(header index, one past the last line of the section) or None."""
+    header = re.compile(r"^\s*\[\s*" + re.escape(name) + r"\s*\]\s*$")
+    any_header = re.compile(r"^\s*\[")
+    start = None
+    for i, line in enumerate(lines):
+        if header.match(line):
+            start = i
+            continue
+        if start is not None and any_header.match(line):
+            return start, i
+    if start is not None:
+        return start, len(lines)
+    return None
+
+
+def first_section(lines):
+    for i, line in enumerate(lines):
+        if re.match(r"^\s*\[", line):
+            return i
+    return None
+
+
+def set_key(text, key, value, section=None):
+    """Return the new file text with one key written, everything else untouched."""
+    lines = text.splitlines(keepends=True)
+    newline = "\r\n" if "\r\n" in (lines[0] if lines else "") else "\n"
+    fresh = f"{key} = {value}{newline}"
+
+    if section is None:
+        for i, existing in enumerate(lines):
+            if key_line_re(key).match(existing):
+                lines[i] = new_line_for(existing, key, value, newline)
+                return "".join(lines)
+        # Not present: put it at the end of the top-level block, i.e. just before
+        # the first [section], so the file keeps its shape and the comments keep
+        # their place. (Upstream's --set-theme prepends instead; either is fine,
+        # this one reads better next to the other top-level keys.)
+        at = first_section(lines)
+        if at is None:
+            lines.append(fresh if not lines or lines[-1].endswith(("\n", "\r")) else newline + fresh)
+        else:
+            lines.insert(at, fresh)
+        return "".join(lines)
+
+    bounds = section_bounds(lines, section)
+    if bounds is None:
+        out = "".join(lines)
+        if out and not out.endswith("\n"):
+            out += newline
+        return out + f"[{section}]{newline}" + fresh
+    start, end = bounds
+    for i in range(start + 1, end):
+        if key_line_re(key).match(lines[i]):
+            lines[i] = new_line_for(lines[i], key, value, newline)
+            return "".join(lines)
+    lines.insert(end, fresh)
+    return "".join(lines)
+
+
+def write_atomic(path, text):
+    directory = os.path.dirname(path)
+    os.makedirs(directory, exist_ok=True)
+    mode = os.stat(path).st_mode & 0o777 if os.path.exists(path) else 0o644
+    fd, tmp = tempfile.mkstemp(dir=directory, prefix=".hyprglaze-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as fh:
+            fh.write(text)
+        os.chmod(tmp, mode)
+        os.replace(tmp, path)  # same directory: atomic, and the watcher sees MOVED_TO
+    except BaseException:
+        os.unlink(tmp)
+        raise
+
+
+def cmd_set(argv):
+    if not argv:
+        sys.exit("hyprglaze-conf: set needs a key")
+    key = argv[0]
+    rest = argv[1:]
+    section = None
+    every = False
+    value = None
+    i = 0
+    while i < len(rest):
+        arg = rest[i]
+        if arg == "--all":
+            every = True
+        elif arg == "--section":
+            i += 1
+            if i >= len(rest):
+                sys.exit("hyprglaze-conf: --section needs a name")
+            section = rest[i]
+        elif arg.startswith("--"):
+            sys.exit(f"hyprglaze-conf: unknown flag {arg}")
+        elif value is None:
+            value = arg
+        else:
+            sys.exit(f"hyprglaze-conf: unexpected extra argument {arg}")
+        i += 1
+    if value is None:
+        sys.exit(f"hyprglaze-conf: set {key} needs a value")
+
+    lit = literal(key, value)
+    path = config_path()
+    text = open(path).read() if os.path.isfile(path) else ""
+
+    if key == "music" and every:
+        for name in MUSIC_SECTIONS:
+            text = set_key(text, key, lit, section=name)
+        write_atomic(path, text)
+        print(f"music = {lit} written to {len(MUSIC_SECTIONS)} sections in {path}")
+        return
+
+    if key == "music" and section is None:
+        cfg = load(path)
+        effect = cfg.get("effect") or "fluid"
+        section = SHARED_SECTIONS.get(effect, effect)
+    if key == "music" and section not in MUSIC_SECTIONS:
+        sys.exit(f"hyprglaze-conf: [{section}] does not read a music key"
+                 " (use --section, or --all for every audio effect)")
+
+    write_atomic(path, set_key(text, key, lit, section=section))
+    where = f" [{section}]" if section else ""
+    print(f"{key} = {lit}{where} written to {path}")
+
+
+def main(argv):
+    if not argv or argv[0] in ("-h", "--help"):
+        print(__doc__.strip())
+        return 0
+    cmd, rest = argv[0], argv[1:]
+    if cmd == "path":
+        cmd_path()
+    elif cmd == "get":
+        cmd_get("--json" in rest)
+    elif cmd == "sections-music":
+        cmd_sections_music()
+    elif cmd == "set":
+        cmd_set(rest)
+    else:
+        sys.exit(f"hyprglaze-conf: unknown command '{cmd}'")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

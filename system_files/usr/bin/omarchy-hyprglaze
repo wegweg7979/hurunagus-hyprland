@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# omarchy:summary=Shader wallpaper (hyprglaze): turn it on or off
-# omarchy:args=<on|off|toggle|status>
-# omarchy:examples=omarchy hyprglaze on | omarchy hyprglaze off | omarchy hyprglaze status
+# omarchy:summary=Shader wallpaper (hyprglaze): on/off, monitor scoping, settings
+# omarchy:args=<on|off|toggle|status|get|set> [...]
+# omarchy:examples=omarchy hyprglaze on | omarchy hyprglaze set effect coral | omarchy hyprglaze get --json
 
 # hyprglaze renders a GLSL shader wallpaper on the background layer and reacts to
 # windows, the cursor and music. It is NOT a wallpaper replacement: it draws on
@@ -27,30 +27,60 @@
 # about. Connector names are per-machine, so `on` enables the monitors that are
 # connected right now and leaves the ones that are not to be added later.
 #
+# Settings live in ONE file, ~/.config/hypr/hyprglaze.toml, which every instance
+# watches with inotify and hot-reloads: writing a key is enough, no restart, no
+# per-monitor duplication. Three keys are exposed here -- effect, theme, music --
+# because those are the ones worth a switch in a panel:
+#
+#   set effect <name>   the GLSL effect (validated against the daemon's list)
+#   set theme <name>    the Gogh colour scheme (upstream's own --set-theme writes it)
+#   set music on|off    audio reactivity, for the section the current effect reads
+#                       (music is per-section upstream: `--all` writes every
+#                       section that honours it)
+#
+# The file is edited line by line and atomically by hyprglaze-conf, which keeps
+# the user's comments and spacing intact -- never regenerate the file wholesale.
+#
 # Env overrides (mainly for testing):
 #   HYPRGLAZE_UNIT      unit prefix        (default hyprglaze@)
 #   HYPRGLAZE_MONITORS  monitor list       (default: hyprctl -j monitors)
 #   HYPRGLAZE_SYSTEMCTL systemctl          (default systemctl)
 #   HYPRGLAZE_HYPRCTL   hyprctl            (default hyprctl)
+#   HYPRGLAZE_CONF      settings helper    (default hyprglaze-conf)
+#   HYPRGLAZE_BIN       the daemon binary  (default hyprglaze)
 
 set -euo pipefail
 
 UNIT="${HYPRGLAZE_UNIT:-hyprglaze@}"
 SYSTEMCTL="${HYPRGLAZE_SYSTEMCTL:-systemctl}"
 HYPRCTL="${HYPRGLAZE_HYPRCTL:-hyprctl}"
+CONF="${HYPRGLAZE_CONF:-hyprglaze-conf}"
+BIN="${HYPRGLAZE_BIN:-hyprglaze}"
+
 action="${1:-status}"
+shift || true
 
 usage() {
   cat <<'EOF'
-Usage: omarchy-hyprglaze <on|off|toggle|status>
+Usage: omarchy-hyprglaze <command> [args]
 
-  on      Start (and enable at login) one hyprglaze instance per connected
-          monitor.
-  off     Stop every instance, disable them, then reload the Hyprland config so
-          the Lua watcher the daemon injects is dropped with the Lua state.
-          The Omarchy wallpaper is untouched and reappears immediately.
-  toggle  on if nothing is running, off if anything is.
-  status  Show the instances and whether the compositor has a hyprglaze layer.
+Wallpaper state:
+  on [monitor...]    Start (and enable at login) an instance per connected
+                     monitor, or only on the monitors named.
+  off [monitor]      Stop the instances (all, or one), disable them, then reload
+                     the Hyprland config so the Lua watcher the daemon injects is
+                     dropped with the Lua state. The Omarchy wallpaper is
+                     untouched and reappears immediately.
+  toggle [monitor]   on if nothing is running, off if anything is.
+  status [--json]    Instances, the compositor's layer surface, and the settings.
+
+Settings (hot-reloaded by every running instance):
+  get [--json]       The effective effect, theme and music setting.
+  set effect <name>  One of the daemon's effects (`hyprglaze --list-effects`).
+  set theme <name>   One of the Gogh schemes (`hyprglaze --list-themes`).
+  set music on|off   Audio reactivity for the current effect's section.
+                     --all writes every section that honours music; --section
+                     <name> targets one explicitly.
 EOF
 }
 
@@ -64,7 +94,7 @@ case "$action" in
     usage
     exit 0
     ;;
-  on | off | toggle | status) ;;
+  on | off | toggle | status | get | set) ;;
   *)
     echo "${0##*/}: unknown action: $action" >&2
     usage >&2
@@ -76,6 +106,10 @@ if ! command -v "$SYSTEMCTL" >/dev/null 2>&1; then
   echo "Error: $SYSTEMCTL not found" >&2
   exit 1
 fi
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# --------------------------------------------------------------- units + state
 
 # Instances systemd actually knows about (running or failed), not the enable
 # symlinks: `list-units --all` is the only view that stays correct when a monitor
@@ -93,24 +127,52 @@ monitors() {
     printf '%s\n' $HYPRGLAZE_MONITORS
     return
   fi
-  if ! command -v "$HYPRCTL" >/dev/null 2>&1; then
+  if ! have "$HYPRCTL"; then
     echo "Error: $HYPRCTL not found (run this inside the Hyprland session)" >&2
     exit 1
   fi
   "$HYPRCTL" -j monitors | jq -r '.[] | select(.disabled == false) | .name'
 }
 
-package_present() {
-  "$SYSTEMCTL" --user list-unit-files "${UNIT}*.service" --no-legend 2>/dev/null | grep -q .
+# The monitors a command was pointed at: the arguments when given, else every
+# connected one. A named monitor must actually be connected, or the caller gets
+# the list instead of a unit that will never come up.
+target_monitors() {
+  if (($# == 0)); then
+    monitors
+    return
+  fi
+  local connected wanted
+  connected="$(monitors)"
+  for wanted in "$@"; do
+    if ! grep -qx "$wanted" <<<"$connected"; then
+      echo "Error: no connected monitor named '$wanted'" >&2
+      echo "       connected: $(tr '\n' ' ' <<<"$connected")" >&2
+      exit 1
+    fi
+    printf '%s\n' "$wanted"
+  done
 }
 
-# A unit that "started" is not a unit that is running. `enable --now` returns 0
-# while the daemon can exit a moment later and sit in a restart loop with nothing
-# on screen -- measured on an Intel N100 box, where the template instance asked
-# for a monitor name that did not exist and the wallpaper never appeared, with
-# this command still reporting "started". So: wait for the unit to settle, and
-# when it does not, say why rather than leaving the user staring at a plain
-# desktop.
+# The instances a command was pointed at: one unit when a monitor is named, else
+# everything systemd knows about. A named monitor with no instance reports so
+# rather than inventing a "stopped" line for a unit that never ran.
+target_instances() {
+  if (($# == 0)); then
+    instances
+    return
+  fi
+  local mon running
+  running="$(instances)"
+  for mon in "$@"; do
+    if grep -qx "${UNIT}${mon}" <<<"$running"; then
+      printf '%s\n' "${UNIT}${mon}"
+    else
+      echo "hyprglaze: nothing running on $mon" >&2
+    fi
+  done
+}
+
 unit_active() {
   "$SYSTEMCTL" --user is-active --quiet "$1"
 }
@@ -130,17 +192,34 @@ explain_unit_failure() {
   local unit="$1" state
   state="$("$SYSTEMCTL" --user show -p Result -p ExecMainStatus "$unit" 2>/dev/null | tr '\n' ' ')"
   [[ -n ${state// /} ]] && echo "    unit state: $state"
-  if command -v journalctl >/dev/null 2>&1; then
+  if have journalctl; then
     journalctl --user -u "$unit" --no-pager --lines=6 2>/dev/null | tail -6 | sed 's/^/    /'
   fi
 }
+
+package_present() {
+  "$SYSTEMCTL" --user list-unit-files "${UNIT}*.service" --no-legend 2>/dev/null | grep -q .
+}
+
+# Does the compositor currently show a hyprglaze layer surface? A cheap, direct
+# read of the thing the user cares about, rather than inferring it from units.
+layer_present() {
+  have "$HYPRCTL" || return 1
+  "$HYPRCTL" layers 2>/dev/null | grep -q 'namespace: hyprglaze'
+}
+
+# ------------------------------------------------------------- on / off / toggle
 
 do_on() {
   if ! package_present; then
     echo "Error: no ${UNIT}<monitor>.service units installed -- is the hyprglaze package present?" >&2
     exit 1
   fi
-  local mon started=0 failed=0
+  local mon started=0 failed=0 targets
+  # Resolve the target list in THIS shell: a failure inside the loop's process
+  # substitution would only end the subshell, so an unconnected monitor name
+  # would be reported and then quietly ignored (exit 0).
+  targets="$(target_monitors "$@")" || exit 1
   while read -r mon; do
     [[ -z $mon ]] && continue
     if unit_active "${UNIT}${mon}.service"; then
@@ -159,28 +238,23 @@ do_on() {
       explain_unit_failure "${UNIT}${mon}.service"
       failed=$((failed + 1))
     fi
-  done < <(monitors)
+  done <<<"$targets"
 
   if ((failed > 0)); then
     echo "hyprglaze: $started started, $failed failed -- the unit's own output is above." >&2
     exit 1
   fi
   if ((started == 0)); then
-    echo "hyprglaze: nothing to start (already running on every connected monitor)"
+    echo "hyprglaze: nothing to start (already running on every target monitor)"
   else
     echo "hyprglaze: $started instance(s) up. Off: ${0##*/} off"
   fi
 }
 
-# Does the compositor currently show a hyprglaze layer surface? A cheap, direct
-# read of the thing the user cares about, rather than inferring it from units.
-layer_present() {
-  command -v "$HYPRCTL" >/dev/null 2>&1 || return 1
-  "$HYPRCTL" layers 2>/dev/null | grep -q 'namespace: hyprglaze'
-}
-
 do_off() {
-  local found=0 name
+  local found=0 name targets
+  # See do_on: resolve in this shell so an error is not swallowed by a subshell.
+  targets="$(target_instances "$@")" || exit 1
   while read -r name; do
     [[ -z $name ]] && continue
     found=$((found + 1))
@@ -189,7 +263,7 @@ do_off() {
     # start is a clean attempt and `status` does not keep showing a failure.
     "$SYSTEMCTL" --user reset-failed "$name.service" 2>/dev/null || true
     echo "stopped: $name.service"
-  done < <(instances)
+  done <<<"$targets"
 
   if ((found == 0)); then
     echo "hyprglaze: nothing running (no reload: nothing to undo)"
@@ -199,10 +273,10 @@ do_off() {
   # Drop the injected Lua watcher. hyprglaze reinstalls it itself after the next
   # reload, so this is safe to run unconditionally. Skipped when there was no
   # instance to stop, so a second `off` does not remap the desktop for nothing.
-  if command -v omarchy-restart-hyprctl >/dev/null 2>&1; then
+  if have omarchy-restart-hyprctl; then
     omarchy-restart-hyprctl >/dev/null 2>&1 || true
     echo "reloaded the Hyprland config (omarchy-restart-hyprctl)"
-  elif command -v "$HYPRCTL" >/dev/null 2>&1; then
+  elif have "$HYPRCTL"; then
     "$HYPRCTL" reload >/dev/null 2>&1 || true
     echo "reloaded the Hyprland config"
   fi
@@ -214,7 +288,149 @@ do_off() {
   echo "hyprglaze off: the Omarchy wallpaper is back (nothing to restore)."
 }
 
+# ------------------------------------------------------------------ settings
+
+require_conf() {
+  if ! have "$CONF"; then
+    echo "Error: $CONF not found -- it ships with this image (system_files/usr/bin/hyprglaze-conf)" >&2
+    exit 1
+  fi
+}
+
+# Validate a name against one of the daemon's own lists, so a typo is refused
+# here instead of being written and silently ignored by the config parser.
+in_list() {
+  local needle="$1" list
+  shift
+  if ! have "$BIN"; then
+    echo "Error: $BIN not found -- cannot validate the name" >&2
+    exit 1
+  fi
+  list="$("$BIN" "$@" 2>/dev/null || true)"
+  if [[ -z $list ]]; then
+    echo "Error: $BIN $* returned nothing" >&2
+    exit 1
+  fi
+  if ! grep -qxF "$needle" <<<"$list"; then
+    echo "Error: '$needle' is not in $BIN $*" >&2
+    echo "       (closest: $(grep -iF "${needle:0:3}" <<<"$list" | head -3 | tr '\n' ' '))" >&2
+    exit 1
+  fi
+}
+
+do_get() {
+  require_conf
+  if [[ ${1:-} == --json ]]; then
+    "$CONF" get --json
+  else
+    "$CONF" get
+  fi
+}
+
+do_set() {
+  require_conf
+  if (($# == 0)); then
+    echo "${0##*/}: set needs a key: effect | theme | music" >&2
+    exit 2
+  fi
+  local key="$1"
+  shift
+  case "$key" in
+    effect)
+      if (($# == 0)); then
+        echo "${0##*/}: set effect needs a name" >&2
+        exit 2
+      fi
+      in_list "$1" --list-effects
+      "$CONF" set effect "$1" >/dev/null
+      echo "effect: $1  (hot-reloaded by every instance)"
+      ;;
+    theme)
+      if (($# == 0)); then
+        echo "${0##*/}: set theme needs a name" >&2
+        exit 2
+      fi
+      in_list "$1" --list-themes
+      # Upstream owns this key and ships the writer, so use it; the running
+      # instances pick the file up through their own watcher either way.
+      if have "$BIN"; then
+        "$BIN" --set-theme "$1" >/dev/null 2>&1 || {
+          echo "Error: $BIN --set-theme failed" >&2
+          exit 1
+        }
+      else
+        "$CONF" set theme "$1" >/dev/null
+      fi
+      echo "theme: $1  (hot-reloaded by every instance)"
+      ;;
+    music)
+      if (($# == 0)); then
+        echo "${0##*/}: set music needs on or off" >&2
+        exit 2
+      fi
+      local value="$1"
+      shift
+      case "$value" in
+        on | off | true | false) ;;
+        *)
+          echo "${0##*/}: set music takes on|off, not '$value'" >&2
+          exit 2
+          ;;
+      esac
+      "$CONF" set music "$value" "$@"
+      ;;
+    *)
+      echo "${0##*/}: unknown setting '$key' (effect | theme | music)" >&2
+      exit 2
+      ;;
+  esac
+}
+
+# -------------------------------------------------------------------- status
+
+do_toggle() {
+  # Scoped: flip each named monitor on its own, so a bar click on one screen does
+  # not disturb the other. Unscoped: off when anything is running, else on.
+  local mon
+  if (($# > 0)); then
+    for mon in "$@"; do
+      if unit_active "${UNIT}${mon}.service"; then
+        do_off "$mon"
+      else
+        do_on "$mon"
+      fi
+    done
+    return
+  fi
+  if [[ -n $(instances) ]]; then
+    do_off
+  else
+    do_on
+  fi
+}
+
+status_json() {
+  local cfg='{}' layer=false items='' name
+  if have "$CONF"; then
+    cfg="$("$CONF" get --json 2>/dev/null || echo '{}')"
+  fi
+  layer_present && layer=true
+  while read -r name; do
+    [[ -z $name ]] && continue
+    items+="$(jq -nc --arg monitor "${name#"$UNIT"}" --arg unit "$name.service" \
+      --argjson active "$(unit_active "$name.service" && echo true || echo false)" \
+      '{monitor: $monitor, unit: $unit, active: $active}'),"
+  done < <(instances)
+  jq -nc --argjson cfg "$cfg" --argjson layer "$layer" --argjson instances "[${items%,}]" \
+    --argjson installed "$(have "$BIN" && echo true || echo false)" \
+    '$cfg + {installed: $installed, layer: $layer, instances: $instances}'
+}
+
 do_status() {
+  if [[ ${1:-} == --json ]]; then
+    status_json
+    return
+  fi
   local list
   list="$(instances)"
   if [[ -z $list ]]; then
@@ -228,24 +444,31 @@ do_status() {
     done <<<"$list"
   fi
 
-  if command -v "$HYPRCTL" >/dev/null 2>&1; then
-    if "$HYPRCTL" layers 2>/dev/null | grep -q 'namespace: hyprglaze'; then
+  if have "$HYPRCTL"; then
+    if layer_present; then
       echo "  compositor: hyprglaze layer surface present"
     else
       echo "  compositor: no hyprglaze layer surface"
     fi
   fi
+
+  if have "$CONF"; then
+    local cfg
+    cfg="$("$CONF" get --json 2>/dev/null || true)"
+    if [[ -n $cfg ]]; then
+      printf '  settings:   effect=%s theme=%s music=%s\n' \
+        "$(jq -r '.effect' <<<"$cfg")" \
+        "$(jq -r '.theme // "(default)"' <<<"$cfg")" \
+        "$(jq -r 'if .music == null then "on (default)" else (if .music then "on" else "off" end) end' <<<"$cfg")"
+    fi
+  fi
 }
 
 case "$action" in
-  on) do_on ;;
-  off) do_off ;;
-  status) do_status ;;
-  toggle)
-    if [[ -n $(instances) ]]; then
-      do_off
-    else
-      do_on
-    fi
-    ;;
+  on) do_on "$@" ;;
+  off) do_off "$@" ;;
+  status) do_status "$@" ;;
+  get) do_get "$@" ;;
+  set) do_set "$@" ;;
+  toggle) do_toggle "$@" ;;
 esac
