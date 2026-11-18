@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "huru.hyprglaze",
+  "name": "Shader wallpaper",
+  "version": "1.0.0",
+  "author": "Hurunagus",
+  "license": "MIT",
+  "description": "hyprglaze on the bar: whether the shader wallpaper is running, which effect and theme it shows, and per-monitor switches. Drives the omarchy-hyprglaze command, so the panel and the terminal do exactly the same thing.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Hyprglaze.qml"
+  },
+  "barWidget": {
+    "displayName": "Shader wallpaper",
+    "description": "hyprglaze state on the bar with a popup: per-monitor on/off, effect, theme and audio reactivity.",
+    "category": "Desktop",
+    "aliases": [
+      "wallpaper",
+      "hyprglaze",
+      "shader",
+      "effect"
+    ],
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "showLabel": false
+    },
+    "schema": [
+      {
+        "key": "showLabel",
+        "type": "boolean",
+        "label": "Show the current effect's name beside the icon",
+        "defaultValue": false
+      }
+    ]
+  }
+}

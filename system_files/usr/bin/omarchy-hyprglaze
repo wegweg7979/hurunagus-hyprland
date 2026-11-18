@@ -410,11 +410,16 @@ do_toggle() {
 }
 
 status_json() {
-  local cfg='{}' layer=false items='' name
+  local cfg='{}' layer=false items='' name mons='[]'
   if have "$CONF"; then
     cfg="$("$CONF" get --json 2>/dev/null || echo '{}')"
   fi
   layer_present && layer=true
+  # The connected monitors as well as the instances: a panel renders a switch
+  # per screen, including the ones with nothing running on them yet.
+  if have "$HYPRCTL" || [[ -n ${HYPRGLAZE_MONITORS:-} ]]; then
+    mons="$(monitors 2>/dev/null | jq -R -s 'split("\n") | map(select(length > 0))' 2>/dev/null || echo '[]')"
+  fi
   while read -r name; do
     [[ -z $name ]] && continue
     items+="$(jq -nc --arg monitor "${name#"$UNIT"}" --arg unit "$name.service" \
@@ -422,8 +427,9 @@ status_json() {
       '{monitor: $monitor, unit: $unit, active: $active}'),"
   done < <(instances)
   jq -nc --argjson cfg "$cfg" --argjson layer "$layer" --argjson instances "[${items%,}]" \
+    --argjson monitors "$mons" \
     --argjson installed "$(have "$BIN" && echo true || echo false)" \
-    '$cfg + {installed: $installed, layer: $layer, instances: $instances}'
+    '$cfg + {installed: $installed, layer: $layer, monitors: $monitors, instances: $instances}'
 }
 
 do_status() {

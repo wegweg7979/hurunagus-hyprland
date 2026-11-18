@@ -19,12 +19,18 @@
 #                                             left, media in the centre, idle
 #                                             300/900, Power profile widget on
 #                                             the right, no world clock, the
-#                                             Huru Calendar icon next to the clock
+#                                             Huru Calendar icon next to the clock,
+#                                             the shader wallpaper widget next to
+#                                             the monitor widget
 #   .config/omarchy/shell.toml                shell base-size 18, bar height 30
 #   .config/omarchy/plugins/thord.powerprofile the CPU power profile bar widget
 #   .config/omarchy/plugins/huru.calendar     the iCloud agenda bar widget
 #                                             (reads the hcal daemon over IPC;
 #                                             sits beside the clock)
+#   .config/omarchy/plugins/huru.hyprglaze    the shader wallpaper bar widget
+#                                             (hyprglaze state, per-monitor
+#                                             on/off, effect, theme, audio
+#                                             reactivity; drives omarchy-hyprglaze)
 #   .config/omarchy/extensions/omarchy-menu.jsonc  System > Power profile picker
 #   .config/omarchy/branding/screensaver.txt  HURUNAGUS idle screensaver art
 #   .config/omarchy/backgrounds/tokyo-night   the Hurunagus wallpaper set
