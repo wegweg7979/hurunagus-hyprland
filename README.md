@@ -18,6 +18,7 @@ The best of Linux in one distro.
 - SDDM user picker — the Omarchy login theme with added user picker for multi-user systems.
 - iCloud Photos, iCloud drive, iCloud calendar ready to log in.
 - Google drive ready to login.
+- Hyprglaze shader wallpaper- ported to fedora, menu bar widget controls.
 - Pre-install list of flatpak software.
 - Hermes agent and opencode ready.
 - Btrfs maintenance - monthly checking.
