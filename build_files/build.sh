@@ -233,6 +233,16 @@ else
 fi
 echo "::endgroup::"
 
+# cava - the spectrum analyser huruwave draws. A ~90 KB console visualiser that
+# taps the output device's monitor source and prints bar heights, which is why
+# the player carries no DSP of its own. Deliberately unguarded: huruwave falls
+# back to a synthetic animation when cava is missing, so a silent absence would
+# be a green build shipping a player whose visualiser quietly does not work.
+echo "::group:: Installing cava (spectrum analyser for huruwave)"
+dnf5 install -y cava
+echo "cava installed: $(rpm -q --qf '%{name}-%{version}-%{release}' cava)"
+echo "::endgroup::"
+
 # airgraph - Wi-Fi channel/congestion viewer (Qt Quick, unprivileged over
 # NetworkManager D-Bus). Our own app: built from its own repo and published to
 # its own COPR, so the image only has to install it. Every runtime dep it needs
