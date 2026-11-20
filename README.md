@@ -1,5 +1,6 @@
 # hurunagus-hyprland
-<img width="959" height="540" alt="image" src="https://github.com/user-attachments/assets/1c967de0-b16b-4046-9373-709a73241dbc" />
+<img width="480" height="270" alt="screenshot-2026-11-20_21-01-44-foot" src="https://github.com/user-attachments/assets/569a355a-5d86-4449-90dd-6f42d5a9d9f2" />
+
 
 Declarative, atomic, immutable Linux system. Fedora Silverblue, Omarchy desktop, Cachyos kernel , automatic weekly updates and all the
 apps I need preinstalled. It is fedora, but it is omarchy, but its Cachyos....
