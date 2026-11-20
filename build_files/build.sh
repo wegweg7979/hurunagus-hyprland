@@ -160,6 +160,25 @@ EXTRA_PACKAGES=(
     # "bake it into the image". Baked, the row shows and the installer's shared
     # setup runs with the package already satisfied.
     voxtype
+    # Virtualisation host: qemu-kvm plus the libvirt daemons. Not an Omarchy
+    # package -- this is a CAPABILITY every hurunagus box is meant to have, so
+    # that a VM can be given a real LAN address. The reason bridging "never
+    # worked" on this image family is not atomicity: session-mode libvirt (the
+    # only thing the virt-manager flatpak can run) is rootless and therefore
+    # cannot create a macvtap or bridge device at all, and a host on Wi-Fi
+    # cannot bridge anyway (802.11 three-address framing). With the daemons
+    # baked in, the flatpak GUI drives qemu:///system and a VM gets its own
+    # DHCP lease from the router through macvtap on a wired NIC.
+    # Deliberately NOT virt-manager: its RPM would duplicate
+    # org.virt_manager.virt-manager in system-flatpaks.list and give the GUI a
+    # second, rebuild-bound update path. Deliberately NOT swtpm or edk2-ovmf
+    # (47 MB): no VM on these boxes asks for a TPM or UEFI firmware yet, and
+    # both are one-line additions here when one does.
+    qemu-kvm
+    libvirt-daemon-kvm
+    libvirt-daemon-config-network
+    libvirt-client
+    virt-install
 )
 
 # Brave browser repo
@@ -170,22 +189,19 @@ dnf5 -y install brave-origin
 HERMES_DESKTOP_URL="https://github.com/fathah/hermes-desktop/releases/download/v0.7.7/hermes-desktop-0.7.7.rpm"
 
 echo "::group:: Installing Hermes Agent and Desktop"
-# Install Hermes Agent using official install script (not available as RPM)
+# Install Hermes Agent using official install script (not available as RPM).
+# Deliberately unguarded: a green build that ships without the agent is a box
+# that is broken on arrival, which is worse than a red build and no update at
+# all. stderr stays visible so a real failure is diagnosable from the CI log.
 echo "Installing Hermes Agent via official installer..."
-curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --no-prompt 2>/dev/null || \
-    echo "warning: Hermes Agent installation failed" >&2
+curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --no-prompt
 
-# Install Hermes Desktop RPM
-if [[ ! -f /tmp/hermes-desktop.rpm ]]; then
-    curl -fsSL -o /tmp/hermes-desktop.rpm "${HERMES_DESKTOP_URL}" || \
-        echo "warning: failed to download hermes-desktop RPM" >&2
-fi
-
-if [[ -f /tmp/hermes-desktop.rpm ]]; then
-    dnf5 install -y --nogpgcheck /tmp/hermes-desktop.rpm || \
-        echo "warning: hermes-desktop installation failed or not available" >&2
-    rm -f /tmp/hermes-desktop.rpm
-fi
+# Install Hermes Desktop RPM. Unguarded for the same reason: a pinned release
+# URL that 404s, or an error page saved as .rpm, must fail the build rather
+# than ship an image with no desktop.
+curl -fsSL -o /tmp/hermes-desktop.rpm "${HERMES_DESKTOP_URL}"
+dnf5 install -y --nogpgcheck /tmp/hermes-desktop.rpm
+rm -f /tmp/hermes-desktop.rpm
 
 echo "::endgroup::"
 
@@ -196,16 +212,19 @@ echo "::endgroup::"
 CLIAMP_URL="https://github.com/bjarneo/cliamp/releases/download/v2.4.0/cliamp-linux-amd64"
 
 echo "::group:: Installing cliamp (terminal music player)"
-if [[ ! -f /tmp/cliamp ]]; then
-    curl -fsSL -o /tmp/cliamp "${CLIAMP_URL}" || \
-        echo "warning: failed to download cliamp binary" >&2
-fi
-
-if [[ -x /tmp/cliamp || -f /tmp/cliamp ]]; then
+# THE ONE SANCTIONED SOFT FAILURE in this script. cliamp is the media player the
+# user actually uses, but it is not part of the desktop's function: a dead
+# release URL must not block an update that carries fixes for everything else.
+# Every other shipped-software install here goes red on failure.
+if curl -fsSL -o /tmp/cliamp "${CLIAMP_URL}"; then
     install -Dm0755 /tmp/cliamp /usr/bin/cliamp
-    dnf5 install -y alsa-lib || echo "warning: alsa-lib install failed" >&2
+    dnf5 install -y alsa-lib || echo "warning: alsa-lib install failed; cliamp may not play" >&2
     rm -f /tmp/cliamp
+    # Log line only, so it stays tolerant of a nonzero exit (no audio device in
+    # a build container). The install itself is checked above.
     echo "cliamp installed: $(/usr/bin/cliamp version 2>/dev/null || true)"
+else
+    echo "warning: failed to download cliamp; shipping without it" >&2
 fi
 echo "::endgroup::"
 
@@ -285,8 +304,13 @@ dnf5 -y copr disable wegweg7979/hyprglaze
 echo "hyprglaze installed: $(rpm -q --qf '%{name}-%{version}-%{release}' hyprglaze)"
 echo "::endgroup::"
 
+# Every package this image asks for is shipped software, so there is no optional
+# tier: the bulk attempt is retried one package at a time purely to NAME the
+# failures in the log, and then the build goes red. A green build that quietly
+# lacks a package ships a broken box on the next reboot, which is the one outcome
+# this image must never produce -- no update is always better than a bad one.
 install_packages() {
-    local failed=() package required_failed=0
+    local failed=() package
 
     if dnf5 install -y "$@"; then
         return 0
@@ -294,33 +318,16 @@ install_packages() {
 
     echo "Bulk install failed; retrying one package at a time to isolate failures." >&2
     for package in "$@"; do
-        if ! dnf5 install -y "${package}"; then
-            failed+=("${package}")
-        fi
+        dnf5 install -y "${package}" || failed+=("${package}")
     done
 
     if (( ${#failed[@]} == 0 )); then
         return 0
     fi
 
-    printf 'Failed packages:\n' >&2
+    printf 'These packages could not be installed:\n' >&2
     printf '  %s\n' "${failed[@]}" >&2
-
-    for package in "${failed[@]}"; do
-        case "${package}" in
-            omedora|omedora-settings|omedora-nerd-fonts|hyprland-no-session|uwsm|quickshell|sddm|sddm-wayland-generic|ttfx|foot|xdg-desktop-portal-hyprland)
-                required_failed=1
-                ;;
-        esac
-    done
-
-    if (( required_failed )); then
-        echo "A required desktop package failed to install." >&2
-        return 1
-    fi
-
-    echo "Only optional packages failed; continuing." >&2
-    return 0
+    return 1
 }
 
 echo "::group:: Installing the Omarchy desktop packages"
@@ -353,7 +360,8 @@ if [[ -d /usr/share/hurunagus/config ]]; then
     chown -R root:root /etc/skel
     echo "seeded $(find /usr/share/hurunagus/config -mindepth 1 \( -type f -o -type l \) | wc -l) files into /etc/skel"
 else
-    echo "warning: /usr/share/hurunagus/config is missing; /etc/skel not seeded" >&2
+    echo "error: /usr/share/hurunagus/config is missing; /etc/skel not seeded" >&2
+    exit 1
 fi
 echo "::endgroup::"
 
@@ -381,11 +389,17 @@ rm -f \
     /usr/share/wayland-sessions/hyprland.desktop \
     /usr/share/wayland-sessions/hyprland-uwsm.desktop
 
+# A unit that is not in the image is skipped on purpose -- docker.socket is
+# requested here while the Docker stack is deliberately excluded from it -- but a
+# unit that IS present and cannot be enabled fails the build: that would ship a
+# box whose service silently never starts.
 enable_unit() {
     local unit="$1"
     if systemctl cat "${unit}" >/dev/null 2>&1; then
-        systemctl enable "${unit}" >/dev/null 2>&1 ||
-            echo "warning: could not enable ${unit}; continuing" >&2
+        if ! systemctl enable "${unit}"; then
+            echo "error: could not enable ${unit}" >&2
+            return 1
+        fi
     fi
 }
 
@@ -415,6 +429,29 @@ enable_unit systemd-oomd.service
 enable_unit podman.socket
 enable_unit docker.socket
 
+# Virtualisation: libvirt's daemons are socket-activated, and Fedora's
+# 90-default.preset only enables them by way of `systemctl preset` during
+# package install -- which does not fire inside the build container, exactly as
+# with sshd above. Enable the two sockets this desktop uses: virtqemud serves
+# qemu:///system (including the macvtap interfaces LAN-reachable VMs need),
+# virtnetworkd serves the network objects. virtproxyd is deliberately left off:
+# nothing here speaks the generic libvirt socket, and remote GUI access goes
+# over virt-ssh-helper (from libvirt-daemon-common, already pulled in).
+enable_unit virtqemud.socket
+enable_unit virtnetworkd.socket
+
+# Bake libvirt's default NAT network into every box up front. The RPM does this
+# with `virsh net-define` in %post, which cannot work in the build container (no
+# running daemon, systemctl silenced), so without these two files the network
+# only exists after someone defines it by hand -- and virt-manager would list a
+# connection whose "default" network is missing. The autostart symlink is the
+# mechanism `virsh net-autostart` itself uses for file-based networks.
+if [[ -f /usr/share/libvirt/networks/default.xml ]]; then
+    install -Dm0644 /usr/share/libvirt/networks/default.xml /etc/libvirt/qemu/networks/default.xml
+    install -d /etc/libvirt/qemu/networks/autostart
+    ln -sfn ../default.xml /etc/libvirt/qemu/networks/autostart/default.xml
+fi
+
 # Units shipped by this image: these must be enabled.
 systemctl enable flatpak-system-install.service
 systemctl enable add-default-user-groups.service
@@ -432,8 +469,7 @@ systemctl disable btrfs-balance.timer btrfs-trim.timer btrfs-defrag.timer >/dev/
 # enable/start calls are no-ops inside the build container, which is why the
 # enable_unit calls above are required.
 if [[ -x /usr/share/btrfsmaintenance/btrfsmaintenance-refresh-cron.sh ]]; then
-    /usr/share/btrfsmaintenance/btrfsmaintenance-refresh-cron.sh systemd-timer >/dev/null 2>&1 ||
-        echo "warning: btrfsmaintenance refresh failed; scrub schedule may be missing" >&2
+    /usr/share/btrfsmaintenance/btrfsmaintenance-refresh-cron.sh systemd-timer
 fi
 
 systemctl set-default graphical.target
@@ -798,8 +834,11 @@ phase_fresh() {
 # it replaces, and always current. Every other package follows the weekly
 # scheduled rebuild, which passes ALL_BUST and rebuilds from scratch.
 echo "::group:: Refreshing the Omarchy runtime (Omedora)"
-dnf5 -y --refresh upgrade omedora omedora-settings || \
-    echo "warning: omedora refresh failed; shipping the version baked into the cached layer" >&2
+# Deliberately unguarded: the cached layer holds the PREVIOUS commit's omedora,
+# and this phase is supposed to be gated on the COPR build for the new one having
+# reached "succeeded". A failed refresh means that gate was missed, so fail here
+# rather than ship a stale runtime against a fresh base.
+dnf5 -y --refresh upgrade omedora omedora-settings
 echo "::endgroup::"
 
 # The cached base layer mirrored the SDDM theme from whatever omedora was
@@ -814,7 +853,8 @@ if [[ -d /usr/share/sddm/themes/omarchy ]]; then
     chown -R root:root /usr/share/omarchy/default/sddm/omarchy
     chmod -R go-w /usr/share/omarchy/default/sddm/omarchy
 else
-    echo "warning: /usr/share/sddm/themes/omarchy is missing; theme not mirrored" >&2
+    echo "error: /usr/share/sddm/themes/omarchy is missing; theme not mirrored" >&2
+    exit 1
 fi
 echo "::endgroup::"
 

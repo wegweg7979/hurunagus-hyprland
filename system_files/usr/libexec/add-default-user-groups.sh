@@ -15,4 +15,13 @@ echo "kvm:x:36:${users}" >> /etc/group
 echo "render:x:105:${users}" >> /etc/group
 echo "input:x:104:${users}" >> /etc/group
 
+# libvirt: the qemu:///system API the flatpak virt-manager drives once this
+# image ships the libvirt daemons. Unlike the groups above (fixed base-image
+# ids) this gid is allocated by the packaging's sysusers file, so read it
+# rather than hardcoding one.
+libvirt_gid="$(getent group libvirt | cut -d: -f3 || true)"
+if [[ -n "${libvirt_gid}" ]]; then
+    echo "libvirt:x:${libvirt_gid}:${users}" >> /etc/group
+fi
+
 touch "$MARKER"
