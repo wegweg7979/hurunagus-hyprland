@@ -188,17 +188,22 @@ dnf5 -y install brave-origin
 # Hermes Desktop (GUI) - download from GitHub releases (not in Fedora repos)
 HERMES_DESKTOP_URL="https://github.com/fathah/hermes-desktop/releases/download/v0.7.7/hermes-desktop-0.7.7.rpm"
 
-echo "::group:: Installing Hermes Agent and Desktop"
-# Install Hermes Agent using official install script (not available as RPM).
-# Deliberately unguarded: a green build that ships without the agent is a box
-# that is broken on arrival, which is worse than a red build and no update at
-# all. stderr stays visible so a real failure is diagnosable from the CI log.
-echo "Installing Hermes Agent via official installer..."
-curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --no-prompt
-
-# Install Hermes Desktop RPM. Unguarded for the same reason: a pinned release
-# URL that 404s, or an error page saved as .rpm, must fail the build rather
-# than ship an image with no desktop.
+echo "::group:: Installing the Hermes desktop app"
+# The Hermes AGENT (CLI) is deliberately NOT installed here. Its official
+# installer is strictly per-user: it clones into $HERMES_HOME (default
+# ~/.hermes), publishes the launcher into ~/.local/bin, and wires that into the
+# user's own shell rc. Run as root in this container build it installs under
+# /root, so no desktop user would ever get the command -- which is what has been
+# happening all along: the old `|| echo "warning: ..."` swallowed two faults at
+# once, an installer flag it does not accept (it takes --non-interactive, not
+# --no-prompt) and a per-user target that cannot exist at build time. The agent
+# belongs to the user, so add-hermes-agent.service installs it for each user at
+# first login instead, where a failure lands in `systemctl --user --failed`
+# rather than hiding behind a green image build. Everything the installer needs
+# is already in this image: git, python3, curl, node.
+#
+# The desktop app IS a system package, so it is installed here, unguarded.
+echo "Installing Hermes Desktop..."
 curl -fsSL -o /tmp/hermes-desktop.rpm "${HERMES_DESKTOP_URL}"
 dnf5 install -y --nogpgcheck /tmp/hermes-desktop.rpm
 rm -f /tmp/hermes-desktop.rpm
@@ -455,6 +460,10 @@ fi
 # Units shipped by this image: these must be enabled.
 systemctl enable flatpak-system-install.service
 systemctl enable add-default-user-groups.service
+# The Hermes agent is a PER-USER install, so its provisioning unit is a user unit
+# enabled for every user (it runs in each user's first session, where --system
+# has no meaning).
+systemctl --global enable add-hermes-agent.service
 
 # Btrfs maintenance: scrub only. Periods come from
 # /etc/default/btrfsmaintenance (shipped in system_files/); balance, defrag and

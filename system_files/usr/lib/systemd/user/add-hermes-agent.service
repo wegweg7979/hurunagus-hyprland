@@ -1,0 +1,22 @@
+[Unit]
+Description=Install Hermes Agent for this user
+Documentation=https://hermes-agent.nousresearch.com/docs/
+# No After=/Wants=network-online.target here on purpose: that target is
+# system-scope, so a user unit's dependency on it resolves to nothing and the
+# unit would start regardless. The script waits for the network itself, bounded,
+# because first login can beat DHCP or Wi-Fi.
+# Runs once per user: the installer's own launcher is the marker, so a machine
+# where the agent is already present does nothing. A failed first attempt retries
+# at the next login, because the marker is still absent.
+ConditionPathExists=!%h/.local/bin/hermes
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/hermes-agent-provision.sh
+RemainAfterExit=yes
+# A first-login install downloads a checkout, a Python toolchain and its
+# dependencies, so it needs longer than the default oneshot timeout.
+TimeoutStartSec=30min
+
+[Install]
+WantedBy=default.target
