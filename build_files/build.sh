@@ -256,6 +256,19 @@ dnf5 -y copr disable wegweg7979/airgraph
 echo "airgraph installed: $(rpm -q --qf '%{name}-%{version}-%{release}' airgraph)"
 echo "::endgroup::"
 
+# huruwave - Omarchy-native music player: YouTube Music, the Apple Music catalog
+# and local files in one window. Same shape as airgraph -- our own app, its own
+# COPR, enabled only for the install. Nothing new gets pulled in at runtime: mpv
+# and yt-dlp are already here, and cava (above) is what it draws its spectrum
+# bars with. Deliberately unguarded: an image that silently ships without the
+# player is worse than a red build.
+echo "::group:: Installing huruwave (music player)"
+dnf5 -y copr enable wegweg7979/huruwave
+dnf5 install -y huruwave
+dnf5 -y copr disable wegweg7979/huruwave
+echo "huruwave installed: $(rpm -q --qf '%{name}-%{version}-%{release}' huruwave)"
+echo "::endgroup::"
+
 # huru-calendar - iCloud (CalDAV) calendar sync daemon. Headless Go, so unlike
 # the other apps here it drags in no Qt at all; it is the data source behind the
 # huru.calendar bar widget in the Hurunagus payload (system_files/usr/share/
