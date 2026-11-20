@@ -258,10 +258,18 @@ echo "::endgroup::"
 
 # huruwave - Omarchy-native music player: YouTube Music, the Apple Music catalog
 # and local files in one window. Same shape as airgraph -- our own app, its own
-# COPR, enabled only for the install. Nothing new gets pulled in at runtime: mpv
-# and yt-dlp are already here, and cava (above) is what it draws its spectrum
-# bars with. Deliberately unguarded: an image that silently ships without the
-# player is worse than a red build.
+# COPR, enabled only for the install. mpv and yt-dlp are already here, and cava
+# (above) is what it draws its spectrum bars with.
+#
+# Since 0.2.0 it also plays Apple Music's FULL tracks in-window, through an
+# embedded Chromium: that needs qt6-qtwebengine, which the app's own Requires pulls
+# in from here (~+300 MiB installed, and the reason the panel can exist at all) --
+# there is nothing to add to this script for it. What that panel uses at runtime is
+# the user's own and never shipped: a Widevine CDM taken from a browser's profile
+# and an Apple session borrowed by huruwave-apple-session.
+#
+# Deliberately unguarded: an image that silently ships without the player is worse
+# than a red build.
 echo "::group:: Installing huruwave (music player)"
 dnf5 -y copr enable wegweg7979/huruwave
 dnf5 install -y huruwave
