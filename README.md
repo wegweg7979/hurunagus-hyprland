@@ -16,6 +16,7 @@ The best of Linux in one distro.
 - CachyOS kernel — from the official CachyOS Fedora port: x86_64-v3 only.
 - Secure boot compatible (Enroll the key).
 - Omarchy Agent skills modified to fit immutable fedora.
+- Flea file manager ported to Fedora. 
 - SDDM user picker — the Omarchy login theme with added user picker for multi-user systems.
 - iCloud Photos, iCloud drive, iCloud calendar ready to log in.
 - Google drive ready to login.
