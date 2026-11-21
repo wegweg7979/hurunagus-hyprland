@@ -340,6 +340,27 @@ dnf5 -y copr disable wegweg7979/hyprglaze
 echo "hyprglaze installed: $(rpm -q --qf '%{name}-%{version}-%{release}' hyprglaze)"
 echo "::endgroup::"
 
+# flea - the Omarchy-native file manager: four views, Quick Look previews, undo on
+# every write, colour tags, ranked search, network places, phones and cameras, and
+# the shelf drop widget for the bar. NOT ours: upstream is
+# github.com/thisisgm/flea (MIT, Arch-only recipe), so wegweg7979/flea-rpm holds
+# the spec and this COPR builds it; the repo is enabled only for the install, like
+# the app COPRs above. The COPR has enable_net on (cargo fetches crates.io and the
+# pinned gpui fork) and builds thin-LTO, because upstream's fat-LTO link cannot
+# finish inside COPR's build ceiling. Requires: omarchy resolves through omedora,
+# and bsdtar (its own package on Fedora; libarchive ships only the library here) is
+# what tar extraction uses.
+# Deliberately unguarded: an image that silently ships without the file manager is
+# worse than a red build. Nothing here makes it the desktop default: the user runs
+# `flea --default` (folder handler, "Show in folder", Super+Shift+F, file chooser)
+# and `flea --picker`, both undoable with `off`.
+echo "::group:: Installing flea (file manager)"
+dnf5 -y copr enable wegweg7979/flea
+dnf5 install -y flea
+dnf5 -y copr disable wegweg7979/flea
+echo "flea installed: $(rpm -q --qf '%{name}-%{version}-%{release}' flea)"
+echo "::endgroup::"
+
 # Every package this image asks for is shipped software, so there is no optional
 # tier: the bulk attempt is retried one package at a time purely to NAME the
 # failures in the log, and then the build goes red. A green build that quietly
