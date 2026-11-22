@@ -534,6 +534,23 @@ if [[ -x /usr/share/btrfsmaintenance/btrfsmaintenance-refresh-cron.sh ]]; then
 fi
 
 systemctl set-default graphical.target
+
+# Fedora 45 ships its base repo definitions in /usr/share/dnf5/repos.d
+# (image-owned, read-only) and no longer in /etc/yum.repos.d, which now holds
+# only third-party repos. dnf5 reads both directories, but bootc-image-builder
+# builds the Anaconda environment from the image's /etc/yum.repos.d alone: with
+# no copy there, an ISO build cannot depsolve the installer (measured: "No match
+# for argument" for all 22 installer-env packages, with no download attempt, at
+# both --use-librepo=True and False), and a fresh install from such an ISO has no
+# Fedora repos for dnf at all. fedora-cisco-openh264 is included because the
+# installer environment resolves openh264 from it. Copies, not symlinks: osbuild
+# copies /etc as plain files. Deliberately unguarded -- if this layout moves
+# again the build must go red, not publish an image no ISO can be built from.
+install -m 0644 /usr/share/dnf5/repos.d/fedora.repo \
+                /usr/share/dnf5/repos.d/fedora-updates.repo \
+                /usr/share/dnf5/repos.d/fedora-cisco-openh264.repo \
+                /etc/yum.repos.d/
+
 echo "::endgroup::"
 }
 
