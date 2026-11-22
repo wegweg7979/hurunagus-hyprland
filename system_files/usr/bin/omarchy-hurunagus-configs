@@ -31,7 +31,13 @@
 #                                             (hyprglaze state, per-monitor
 #                                             on/off, effect, theme, audio
 #                                             reactivity; drives omarchy-hyprglaze)
-#   .config/omarchy/extensions/omarchy-menu.jsonc  System > Power profile picker
+#   .config/omarchy/extensions/omarchy-menu.jsonc  System > Power profile picker,
+#                                             System > Rebase to another variant
+#                                             (hurubase, via the wrapper below)
+#   .local/bin/omarchy-hurunagus-rebase       System > Rebase to another variant:
+#                                             gives hurubase the terminal its
+#                                             prompts need, and fetches hurubase
+#                                             into ~/.cache when missing
 #   .config/omarchy/branding/screensaver.txt  HURUNAGUS idle screensaver art
 #   .config/omarchy/backgrounds/tokyo-night   the Hurunagus wallpaper set
 #   .config/foot/foot.ini                     translucent foot (alpha 0.8)

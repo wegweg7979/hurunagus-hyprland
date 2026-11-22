@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# omarchy-hurunagus-rebase — the menu's entry point to hurubase.
+#
+#   omarchy-hurunagus-rebase <image-address>   rebase onto that address
+#   omarchy-hurunagus-rebase --check           hurubase --check, on this box's image
+#
+# hurubase (github.com/wegweg7979/hurunagus-rebase) is the safe rebase helper:
+# it preflights, backs up what it replaces, rebases onto the address you give it,
+# and then walks the post-reboot fixes with you one prompt at a time.  It is
+# interactive BY DESIGN — every prompt reads /dev/tty and asks before changing
+# anything — so it needs a real terminal, which is what this wrapper provides.
+#
+# It also removes the one thing that stopped hurubase being a menu item: the tool
+# had to already be on PATH.  This finds an existing copy (yours, the image's, or
+# a checkout) and otherwise fetches one into ~/.cache, the same way the desktop
+# provisions other per-user tools.
+#
+# Hurunagus is an immutable bootc image: a rebase is the supported way to move
+# between variants, and it is a reboot — not an in-place install.
+
+set -euo pipefail
+
+say() { printf '%s\n' "$*"; }
+die() { printf 'omarchy-hurunagus-rebase: %s\n' "$*" >&2; exit 1; }
+
+mode=rebase
+if [[ ${1:-} == --check ]]; then
+    mode=check
+    shift
+fi
+
+# The image this machine currently runs, as a plain registry address.
+booted_address() {
+    rpm-ostree status --json 2>/dev/null | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)["deployments"][0]
+except Exception:
+    raise SystemExit(0)
+ref = d.get("container-image-reference") or d.get("origin") or ""
+for p in ("ostree-unverified-image:docker://", "ostree-unverified-registry:",
+          "ostree-image-signed:docker://", "ostree-unverified-image:"):
+    if ref.startswith(p):
+        ref = ref[len(p):]
+        break
+print(ref)
+' 2>/dev/null
+}
+
+if [[ $mode == check ]]; then
+    ref=$(booted_address)
+    [[ -n $ref ]] || die "cannot read the image this machine is running"
+else
+    [[ $# -eq 1 ]] || die "usage: omarchy-hurunagus-rebase <image-address> | --check"
+    ref=$1
+    # The project does not stand behind vendor-flavoured images, and this is a
+    # menu item — refuse rather than warn.
+    [[ $ref != *nvidia* ]] || die "refusing '$ref': this project does not ship nvidia-flavoured images"
+    # Refuse anything that is not a registry image address.  hurubase does the
+    # same, but a menu row should not even launch for a typo.
+    [[ $ref == */*:* ]] || die "'$ref' is not an image address (registry/owner/name:tag)"
+fi
+
+find_hurubase() {
+    local c
+    for c in "${HURUBASE:-}" "$HOME/.local/bin/hurubase" /usr/bin/hurubase \
+             "$HOME/Documents/GitHub/hurunagus-rebase/hurubase"; do
+        [[ -n $c && -x $c ]] && { printf '%s\n' "$c"; return 0; }
+    done
+    return 1
+}
+
+if ! hurubase=$(find_hurubase); then
+    cache="${XDG_CACHE_HOME:-$HOME/.cache}/hurunagus-rebase"
+    if [[ ! -x $cache/hurubase ]]; then
+        command -v git >/dev/null || die "no hurubase found and git is not installed to fetch one"
+        say "Fetching hurubase into $cache (first run)..."
+        rm -rf "$cache"
+        git clone -q --depth=1 https://github.com/wegweg7979/hurunagus-rebase "$cache" \
+            || die "could not clone hurubase"
+    fi
+    hurubase=$cache/hurubase
+fi
+
+# What the user sees before the checklist starts.
+launch() { # $1 = command line to run inside a terminal
+    if command -v omarchy-launch-or-focus-tui >/dev/null; then
+        exec omarchy-launch-or-focus-tui "bash -c \"$1\""
+    fi
+    local term
+    for term in kitty foot alacritty; do
+        command -v "$term" >/dev/null && exec "$term" -e bash -c "$1"
+    done
+    die "no terminal emulator found (kitty, foot, alacritty)"
+}
+
+if [[ $mode == check ]]; then
+    say "hurubase --check on ${ref}"
+    launch "'$hurubase' --check '$ref'; printf '\\n[press enter to close] '; read -r _ </dev/tty"
+fi
+
+say "hurubase:    $hurubase"
+say "now running: $(booted_address)"
+say "target:      $ref"
+say
+say "It asks before every change. A rebase is a reboot, not an in-place install."
+printf 'Continue? [Y/n] '
+read -r answer </dev/tty || answer=""
+[[ ${answer:-y} == [nN]* ]] && { say "Nothing done."; exit 0; }
+
+launch "'$hurubase' '$ref'; printf '\\n[press enter to close] '; read -r _ </dev/tty"

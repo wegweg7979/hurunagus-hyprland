@@ -32,4 +32,16 @@
   // the shell (Menu.qml); nothing in the stock menu referenced it, so on a
   // machine without a battery there was no way to switch profiles.
   "system.power-profile": {"icon":"\uf0e7","label":"Power profile","provider":"power-profiles"},
+
+  // Rebase this machine onto another Hurunagus variant, through hurubase
+  // (github.com/wegweg7979/hurunagus-rebase) — the same command the image README
+  // documents.  omarchy-hurunagus-rebase wraps it: hurubase's prompts read
+  // /dev/tty, so it needs a real terminal, and the wrapper fetches a copy for a
+  // machine that has none.  A rebase is a reboot, not an in-place change, and
+  // the variant you are already running is refused by hurubase itself.
+  "system.rebase": {"icon":"\uf021","label":"Rebase to another variant"},
+  "system.rebase.hyprland": {"icon":"\uf17c","label":"Hyprland + Omarchy","description":"the flagship: Hyprland + Omarchy on Fedora bootc","when":"omarchy-cmd-present omarchy-hurunagus-rebase","action":"omarchy-hurunagus-rebase ghcr.io/wegweg7979/hurunagus-hyprland:latest"},
+  "system.rebase.silverblue": {"icon":"\uf17c","label":"Silverblue + Niri + DMS","description":"the Silverblue line with the Niri session","when":"omarchy-cmd-present omarchy-hurunagus-rebase","action":"omarchy-hurunagus-rebase ghcr.io/wegweg7979/hurunagus-silverblue:latest"},
+  "system.rebase.ublue": {"icon":"\uf17c","label":"uBlue + Niri + DMS","description":"the ublue image-template line with the Niri session","when":"omarchy-cmd-present omarchy-hurunagus-rebase","action":"omarchy-hurunagus-rebase ghcr.io/wegweg7979/hurunagus-ublue:latest"},
+  "system.rebase.check": {"icon":"\uf00c","label":"Check the rebase plan (changes nothing)","description":"hurubase --check against the image this machine runs now","when":"omarchy-cmd-present omarchy-hurunagus-rebase","action":"omarchy-hurunagus-rebase --check"},
 }
