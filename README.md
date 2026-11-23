@@ -36,7 +36,9 @@ system suitable for multimedia and modern computing in 2026. I need my computer 
 for more than one machine, you should really take the time to make your own for
 exactly YOUR needs.
 
+Install via network iso: https://github.com/wegweg7979/hurunagus-installer/releases/download/installer-20261123-4f03600/hurunagus-installer-net.iso
 
+OR rebase an existing atomic fedora
 - First rebase to the unsigned image, to get the proper signing keys and policies
   installed:
   ```sh
