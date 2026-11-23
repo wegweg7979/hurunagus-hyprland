@@ -59,8 +59,7 @@ OR rebase an existing atomic fedora
 
 
 Your existing `$HOME` is preserved across the rebase — atomic rebases never touch
-it. That means the Omarchy defaults this image ships in `/etc/skel` (dotfiles for
-`~/.config/hypr` and `~/.config/omarchy`, the branding/screensaver files, themes,
+it. That means the Omarchy defaults this image ships, the branding/screensaver files, themes,
 toggles, migration markers) will **not** be seeded into your current user's home.
 To adopt them, run this once **after your first login** on the new system:
 
@@ -69,7 +68,7 @@ omarchy-reinstall-configs
 ```
 
 New users (fresh installs, or accounts created after the rebase) get these
-automatically from `/etc/skel` and do not need this step.
+automatically and do not need this step.
 
 
 <img width="512" height="512" alt="Gemini_Generated_Image_rokat0rokat0roka" src="https://github.com/user-attachments/assets/d0bfbdca-0e15-4e00-a0f9-16cf8704a825" />
