@@ -277,6 +277,21 @@ dnf5 -y copr disable wegweg7979/huruwave
 echo "huruwave installed: $(rpm -q --qf '%{name}-%{version}-%{release}' huruwave)"
 echo "::endgroup::"
 
+# hurutube - a small YouTube player: search, and playback in mpv with VA-API
+# hardware decode. Same shape as the apps above -- our own repo, our own COPR,
+# enabled only for the install, nothing on the host updating from it afterwards.
+# mpv, yt-dlp and the JS runtime yt-dlp wants (nodejs) are already in this image,
+# and so is the Qt it needs, so nothing new arrives at runtime; the package pulls
+# no dependency this image does not already carry.
+# Deliberately unguarded: an image that silently ships without the player is worse
+# than a red build.
+echo "::group:: Installing hurutube (YouTube player)"
+dnf5 -y copr enable wegweg7979/hurutube
+dnf5 install -y hurutube
+dnf5 -y copr disable wegweg7979/hurutube
+echo "hurutube installed: $(rpm -q --qf '%{name}-%{version}-%{release}' hurutube)"
+echo "::endgroup::"
+
 # huru-calendar - iCloud (CalDAV) calendar sync daemon. Headless Go, so unlike
 # the other apps here it drags in no Qt at all; it is the data source behind the
 # huru.calendar bar widget in the Hurunagus payload (system_files/usr/share/
