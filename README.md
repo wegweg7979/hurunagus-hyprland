@@ -27,15 +27,14 @@ The best of Linux in one distro.
 - Hermes agent and opencode ready.
 - Btrfs maintenance - monthly checking.
 
-Dont use this —you can make your own, it is not too difficult and quite fun.
-https://github.com/ublue-os/image-template
 
 Be aware installed apps and features will be added or removed as I see fit at
 anytime. Hence the warning to not consider this a "stable" OS for anyone except
 myself. It is, despite that, a rock solid, efficient and fully featured operating
 system suitable for multimedia and modern computing in 2026. I need my computer to work properly, and this does "just work". If you are the admin
 for more than one machine, you should really take the time to make your own for
-exactly YOUR needs.
+exactly YOUR needs, it is not too difficult and quite fun.
+https://github.com/ublue-os/image-template
 
 Install via network iso: https://github.com/wegweg7979/hurunagus-installer/releases/download/installer-20261123-4f03600/hurunagus-installer-net.iso
 
