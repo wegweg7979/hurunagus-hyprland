@@ -154,7 +154,21 @@ build $target_image=image_name $tag=default_tag:
         PODMAN_BUILD_ARGS+=("--no-cache")
     fi
 
-    podman build "${PODMAN_BUILD_ARGS[@]}" .
+    # The image is the product; the cache is not. A registry cache export can fail
+    # at the end of an otherwise good build --
+    # `Error: failed pushing cache to ...: locating image with ID ...: image not known`
+    # -- and podman build returns 125 for that exactly as it does for a real build
+    # failure. So this recipe used to die there and skip Tag/Push/Sign, publishing
+    # nothing: measured twice in two dispatches. On a fresh runner the tag can only
+    # be the output of THIS build, so an existing tag means the image is fine and
+    # only the cache export failed; no tag is a real failure and still fails.
+    if ! podman build "${PODMAN_BUILD_ARGS[@]}" .; then
+        if podman image exists "${target_image}:${tag}"; then
+            echo "::warning::cache export failed, but ${target_image}:${tag} was built; continuing without a fresh cache"
+        else
+            exit 1
+        fi
+    fi
 
 # Split the image for smaller updates (New)!
 rechunk $target_image=image_name $tag=default_tag:
