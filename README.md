@@ -1,4 +1,7 @@
 # hurunagus-hyprland
+
+![hurunagus](assets/hurunagus-wordmark.png)
+
 <img width="960" height="540" alt="screenshot-2026-11-20_21-01-44-foot" src="https://github.com/user-attachments/assets/569a355a-5d86-4449-90dd-6f42d5a9d9f2" />
 
 
