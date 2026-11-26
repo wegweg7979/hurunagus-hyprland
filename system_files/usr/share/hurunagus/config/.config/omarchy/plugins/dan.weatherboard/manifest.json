@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "dan.weatherboard",
+  "name": "Weather board",
+  "version": "1.0.0",
+  "author": "dan",
+  "description": "Full-screen retro weather board: current conditions, sun arc, wind compass, a 24-hour block chart and hourly/7-day tables. Summon with: omarchy-shell shell summon dan.weatherboard",
+  "kinds": [
+    "panel"
+  ],
+  "entryPoints": {
+    "panel": "Panel.qml"
+  }
+}

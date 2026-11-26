@@ -44,4 +44,14 @@
   "system.rebase.silverblue": {"icon":"\uf17c","label":"Silverblue + Niri + DMS","description":"the Silverblue line with the Niri session","when":"omarchy-cmd-present omarchy-hurunagus-rebase","action":"omarchy-hurunagus-rebase ghcr.io/wegweg7979/hurunagus-silverblue:latest"},
   "system.rebase.ublue": {"icon":"\uf17c","label":"uBlue + Niri + DMS","description":"the ublue image-template line with the Niri session","when":"omarchy-cmd-present omarchy-hurunagus-rebase","action":"omarchy-hurunagus-rebase ghcr.io/wegweg7979/hurunagus-ublue:latest"},
   "system.rebase.check": {"icon":"\uf00c","label":"Check the rebase plan (changes nothing)","description":"hurubase --check against the image this machine runs now","when":"omarchy-cmd-present omarchy-hurunagus-rebase","action":"omarchy-hurunagus-rebase --check"},
+
+  // The full-screen retro weather board (dan.weatherboard, from the plugins
+  // directory above). A panel has no bar slot to be clicked, so the menu row is
+  // how it is reached on a fresh machine; the weather pill's own popup is the
+  // bar widget beside the clock. Sits under Trigger with the other summon rows
+  // (clipboard history, the speed tests). Bind a key to the same command
+  // yourself if you want one -- Omarchy ships no binding for it, and
+  // ~/.config/hypr/bindings.lua is personal overrides, so the payload must not
+  // own it.
+  "trigger.weather-board": {"icon":"\uf0c2","label":"Weather board","aliases":["weather-board","forecast"],"description":"the full-screen retro forecast, on the focused monitor","action":"omarchy-shell shell summon dan.weatherboard"},
 }

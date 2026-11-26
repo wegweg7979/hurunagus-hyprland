@@ -14,26 +14,39 @@
 # This command replays ONLY the Hurunagus deltas, from the payload baked into
 # the image at /usr/share/hurunagus/config:
 #
-#   .config/omarchy/shell.json                bar at the bottom and clear,
-#                                             Omarchy's workspaces widget on the
-#                                             left, media in the centre, idle
-#                                             300/900, Power profile widget on
-#                                             the right, no world clock, the
-#                                             Huru Calendar icon next to the clock,
-#                                             the shader wallpaper widget next to
-#                                             the monitor widget
+#   .config/omarchy/shell.json                bar at the bottom and opaque,
+#                                             Workspaces plus on the left, media
+#                                             in the centre, idle 300/900, Power
+#                                             profile widget on the right, no
+#                                             world clock, the Huru Calendar icon
+#                                             next to the clock, the retro weather
+#                                             pill beside it, the shader wallpaper
+#                                             widget next to the monitor widget
 #   .config/omarchy/shell.toml                shell base-size 18, bar height 30
 #   .config/omarchy/plugins/thord.powerprofile the CPU power profile bar widget
+#   .config/omarchy/plugins/thord.workspaces  Workspaces plus: per-monitor
+#                                             workspaces with the layout, window
+#                                             state and the open/minimized windows
+#                                             (third-party, MIT: McNutty/
+#                                             omarchy-workspaces)
 #   .config/omarchy/plugins/huru.calendar     the iCloud agenda bar widget
 #                                             (reads the hcal daemon over IPC;
 #                                             sits beside the clock)
+#   .config/omarchy/plugins/dan.weather       the weather pill and its retro detail
+#                                             popup -- an Omarchy widget clone, so
+#                                             it keeps the stock moduleName and
+#                                             takes the stock widget's slot
+#   .config/omarchy/plugins/dan.weatherboard  the full-screen retro weather board,
+#                                             a panel with no bar slot of its own:
+#                                             reached from Trigger > Weather board
 #   .config/omarchy/plugins/huru.hyprglaze    the shader wallpaper bar widget
 #                                             (hyprglaze state, per-monitor
 #                                             on/off, effect, theme, audio
 #                                             reactivity; drives omarchy-hyprglaze)
 #   .config/omarchy/extensions/omarchy-menu.jsonc  System > Power profile picker,
 #                                             System > Rebase to another variant
-#                                             (hurubase, via the wrapper below)
+#                                             (hurubase, via the wrapper below),
+#                                             Trigger > Weather board
 #   .local/bin/omarchy-hurunagus-rebase       System > Rebase to another variant:
 #                                             gives hurubase the terminal its
 #                                             prompts need, and fetches hurubase
@@ -41,6 +54,12 @@
 #   .config/omarchy/branding/screensaver.txt  HURUNAGUS idle screensaver art
 #   .config/omarchy/backgrounds/tokyo-night   the Hurunagus wallpaper set
 #   .config/foot/foot.ini                     translucent foot (alpha 0.8)
+#
+# ONE thing the payload needs but deliberately does not carry: the HuruPixel pixel
+# face behind the board's HURU-WX wordmark. A font belongs system-wide, not in one
+# user's $HOME, so the image installs it at /usr/share/fonts/hurunagus/ (see the
+# fc-cache step in build.sh). The board falls back to the shell font when the
+# family is absent, so a machine that loses it degrades rather than breaks.
 #
 # Every other file in $HOME -- including the Omarchy defaults you have edited --
 # is left exactly as it is. Replay only ever writes: a file dropped from the

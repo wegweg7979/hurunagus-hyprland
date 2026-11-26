@@ -6,7 +6,7 @@
           "id": "omarchy.menu"
         },
         {
-          "id": "omarchy.workspaces"
+          "id": "thord.workspaces"
         }
       ],
       "centerBegin": [
@@ -27,7 +27,7 @@
           "id": "huru.calendar"
         },
         {
-          "id": "omarchy.weather"
+          "id": "dan.weather"
         },
         {
           "id": "omarchy.media"
@@ -70,7 +70,7 @@
       ]
     },
     "position": "bottom",
-    "background": "none"
+    "background": "opaque"
   },
   "idle": {
     "lock": 900,

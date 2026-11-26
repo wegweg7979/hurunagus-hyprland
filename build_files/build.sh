@@ -417,6 +417,23 @@ echo "::group:: Copying Hurunagus system files"
 cp -avf /ctx/system_files/. /
 echo "::endgroup::"
 
+# HuruPixel - the Hurunagus pixel face, drawn for the HURU-WX wordmark on the
+# weather board (the same face as the README's wordmark art). A plain file rather
+# than an RPM: it is ours, it is 7 KB, and the shell resolves it by family name at
+# runtime. Cached here so the first login does not pay for it. Deliberately
+# unguarded, like huru-calendar and hyprglaze above: an image that ships the board
+# with a silently-fallback wordmark is worse than a red build. The board itself
+# falls back to the shell font if the family is ever absent, so a machine that
+# loses the font degrades instead of breaking.
+echo "::group:: Caching the Hurunagus font"
+if [[ ! -f /usr/share/fonts/hurunagus/HuruPixel-Regular.ttf ]]; then
+    echo "error: HuruPixel-Regular.ttf missing from system_files/usr/share/fonts/hurunagus" >&2
+    exit 1
+fi
+fc-cache -f /usr/share/fonts/hurunagus
+echo "HuruPixel resolves to: $(fc-match -f '%{family}' HuruPixel)"
+echo "::endgroup::"
+
 # The Hurunagus look-and-feel payload lives in /usr/share/hurunagus/config and is
 # replayed into a live $HOME by omarchy-hurunagus-configs (user-run, never
 # automatic). Seed /etc/skel from that same tree so a brand new user starts with
