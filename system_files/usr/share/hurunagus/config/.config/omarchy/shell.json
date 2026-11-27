@@ -76,6 +76,10 @@
     "lock": 900,
     "screensaver": 300
   },
-  "plugins": [],
+  "plugins": [
+    {
+      "id": "dan.weatherboard"
+    }
+  ],
   "version": 1
 }
