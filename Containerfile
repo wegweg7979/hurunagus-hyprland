@@ -36,6 +36,10 @@ FROM ghcr.io/ublue-os/base-main:latest
 ##                 the CachyOS kernel from its COPR.
 ##   ALL_BUST      weekly scheduled builds and manual "fresh" runs: rebuild every
 ##                 layer from scratch, i.e. exactly what --no-cache used to do.
+##
+##   KERNEL_PIN    an exact kernel NEVRA, declared at phase 2 rather than here so a
+##                 bump re-runs the kernel layer and later ones while the base stays
+##                 cached. See that block for how (and when) it moves.
 ARG OMEDORA_BUST=0
 ARG KERNEL_BUST=0
 ARG ALL_BUST=0
@@ -61,14 +65,32 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=tmpfs,dst=/tmp \
     ALL_BUST="${ALL_BUST}" /ctx/build.sh base
 
-## Phase 2/4 -- the CachyOS kernel swap and its initramfs. The kernel COPR moves
-## on its own schedule, so this is refreshed by the weekly build rather than by
-## every push.
+## Phase 2/4 -- the CachyOS kernel swap and its initramfs, pinned to an exact NEVRA.
+##
+## The COPR publishes daily, so this installs KERNEL_PIN rather than floating.
+## Note what the pin is NOT doing: it does not stop this layer from re-running. A
+## RUN's cache key includes its PARENT layer, and phase 1 -- which installs the
+## payload -- sits above this one, so any commit touching build_files/ or
+## system_files/ re-runs this phase whatever it mounts (mounting a narrower context
+## would change nothing here; the layer chain decides). Putting the kernel ahead of
+## the payload would need the plymouth theme in its own earlier phase, because the
+## theme has to be in place before dracut generates the initramfs.
+##
+## What the pin buys is the part that actually bites: a re-run installs the SAME
+## kernel. It moves only when the weekly build resolves a new one, proves it
+## builds, and commits it on success (.github/workflows/build.yml) -- so a new
+## kernel arrives on Tuesday, or not at all.
+##
+## Declared here rather than with the ARGs above on purpose: a bump then
+## invalidates this phase and everything after it, while the ~10 minute base layer
+## stays cached.
+ARG KERNEL_PIN=7.3.6-2.cachyos1.fc45
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     --mount=type=tmpfs,dst=/tmp \
-    ALL_BUST="${ALL_BUST}" KERNEL_BUST="${KERNEL_BUST}" /ctx/build.sh kernel
+    ALL_BUST="${ALL_BUST}" KERNEL_BUST="${KERNEL_BUST}" KERNEL_PIN="${KERNEL_PIN}" \
+    /ctx/build.sh kernel
 
 ## Phase 3/4 -- Secure Boot signing of the kernel image. Its own layer on purpose:
 ## the layer cache key CANNOT see a build secret's contents, so signing must not

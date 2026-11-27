@@ -736,11 +736,26 @@ dnf5 upgrade -y zstd
 echo "Enabling ${KERNEL_COPR}"
 dnf5 -y copr enable "${KERNEL_COPR}"
 
-echo "Installing ${KERNEL_PACKAGES[*]}"
+# An exact NEVRA per package when KERNEL_PIN is set (the Containerfile's ARG).
+# Nothing here floats in the normal case: the COPR publishes daily, and a
+# re-resolution of this phase must land on the kernel the image was pinned to,
+# otherwise a payload commit silently changes the kernel. Empty or "latest" floats
+# on purpose, for the weekly build's candidate.
+KERNEL_PIN="${KERNEL_PIN:-}"
+if [[ -n "${KERNEL_PIN}" && "${KERNEL_PIN}" != "latest" ]]; then
+    KERNEL_SPECS=()
+    for kernel_pkg in "${KERNEL_PACKAGES[@]}"; do
+        KERNEL_SPECS+=("${kernel_pkg}-${KERNEL_PIN}")
+    done
+else
+    KERNEL_SPECS=("${KERNEL_PACKAGES[@]}")
+fi
+
+echo "Installing ${KERNEL_SPECS[*]}"
 # Deliberately strict: with the stock kernel already removed, a failure here
-# would leave the image with no kernel at all, so abort rather than ship one
-# that cannot boot.
-dnf5 install -y "${KERNEL_PACKAGES[@]}"
+# would leave the image with no kernel at all, so abort rather than ship one that
+# cannot boot. A pin the COPR has since pruned fails here too, loudly.
+dnf5 install -y "${KERNEL_SPECS[@]}"
 
 mapfile -t KERNEL_VERSIONS < <(find /usr/lib/modules -mindepth 1 -maxdepth 1 -type d -printf '%f\n')
 if (( ${#KERNEL_VERSIONS[@]} != 1 )); then
@@ -750,6 +765,18 @@ if (( ${#KERNEL_VERSIONS[@]} != 1 )); then
 fi
 KERNEL_VERSION="${KERNEL_VERSIONS[0]}"
 echo "Kernel version: ${KERNEL_VERSION}"
+
+# The module directory is named for the kernel's version-release WITH its arch
+# (7.3.6-2.cachyos1.fc45.x86_64), while the pin is the dnf spec without one, so
+# compare arch-stripped. This is what makes the pin real: dnf can satisfy a spec
+# with another build, and the image would then carry a kernel nobody chose.
+KERNEL_VERSION_SHORT="${KERNEL_VERSION%.x86_64}"
+if [[ -n "${KERNEL_PIN}" && "${KERNEL_PIN}" != "latest" && "${KERNEL_VERSION_SHORT}" != "${KERNEL_PIN}" ]]; then
+    printf 'pinned kernel %s is not what landed: /usr/lib/modules holds %s\n' \
+        "${KERNEL_PIN}" "${KERNEL_VERSION}" >&2
+    printf 'Refusing to ship a kernel the recipe did not choose.\n' >&2
+    exit 1
+fi
 
 restore_kernel_install_hooks
 

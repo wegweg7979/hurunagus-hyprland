@@ -36,7 +36,9 @@ jobs:
     runs-on: ubuntu-24.04
 
     permissions:
-      contents: read
+      # write, not read: the weekly job commits the kernel pin only once the image
+      # built with it has been pushed and signed (last step of the job).
+      contents: write
       packages: write
       id-token: write
 
@@ -118,6 +120,34 @@ jobs:
             echo "Secure Boot signing key materialized (${#SB_SIGNING_KEY} characters)"
           fi
 
+      # The pin is a deliberate choice, so the weekly run asks the COPR what it is
+      # offering BEFORE the build and hands it over as a candidate. Nothing else
+      # moves the pin: an ordinary push builds the pin already committed, which is
+      # how a new kernel arrives on a Tuesday or not at all. Resolved here rather
+      # than inside the build because this job needs the value afterwards.
+      - name: Resolve the kernel the weekly build should try
+        id: kernel
+        if: github.event_name == 'schedule' || inputs.fresh
+        run: |
+          set -euo pipefail
+          current=$(sed -n 's/^ARG KERNEL_PIN=//p' Containerfile | head -1)
+          # rootful podman, like every other step here, so this reuses the image
+          # the build is about to use instead of pulling a second copy of it.
+          candidate=$(sudo podman run --rm ghcr.io/ublue-os/base-main:latest bash -c \
+            'dnf5 -y copr enable bieszczaders/kernel-cachyos >/dev/null &&
+             dnf5 repoquery --available --latest-limit=1 --arch x86_64 --qf "%{evr}" kernel-cachyos' \
+            | tail -1 | tr -d "\r\n")
+          if [[ -z "${candidate}" ]]; then
+            echo "::error::could not resolve a kernel from the COPR"; exit 1
+          fi
+          echo "current=${current}"     >> "$GITHUB_OUTPUT"
+          echo "candidate=${candidate}" >> "$GITHUB_OUTPUT"
+          if [[ "${candidate}" == "${current}" ]]; then
+            echo "Already pinned at ${current}; the build re-resolves the same NEVRA."
+          else
+            echo "::notice::kernel move available: ${current} -> ${candidate}"
+          fi
+
       # This actually builds the container image
       - name: Build Image
         id: build-image
@@ -128,7 +158,9 @@ jobs:
           # into a stable base layer, a kernel layer and a volatile tail, so bust
           # just the tail on every build. A scheduled or "fresh" run also sets
           # ALL_BUST/KERNEL_BUST, which is exactly the old --no-cache behaviour.
-          EXTRA_BUILD_ARGS: "--build-arg OMEDORA_BUST=${{ github.run_id }}${{ (github.event_name == 'schedule' || inputs.fresh) && format(' --build-arg ALL_BUST={0} --build-arg KERNEL_BUST={0}', github.run_id) || '' }}"
+          # KERNEL_PIN only ever rides in on a scheduled or "fresh" run, with the
+          # version resolved above -- that is the single lever that moves the kernel.
+          EXTRA_BUILD_ARGS: "--build-arg OMEDORA_BUST=${{ github.run_id }}${{ (github.event_name == 'schedule' || inputs.fresh) && format(' --build-arg ALL_BUST={0} --build-arg KERNEL_BUST={0}', github.run_id) || '' }}${{ steps.kernel.outputs.candidate && format(' --build-arg KERNEL_PIN={0}', steps.kernel.outputs.candidate) || '' }}"
           # Registry layer cache. Bare repository (no tag) -- podman writes its
           # cache manifests under its own tag. Only enabled where the job has a
           # registry login: anonymous cache pulls of a private package would fail
@@ -222,4 +254,30 @@ jobs:
           DIGEST: ${{ steps.push-image.outputs.digest }}
         run: |
           cosign sign -y --key env://COSIGN_PRIVATE_KEY ${IMAGE_REGISTRY}/${IMAGE_NAME}@${DIGEST}
+
+      # The pin moves here and only here, and only once the image carrying that
+      # kernel has been built, pushed and signed above. Any earlier failure means the
+      # candidate was never proven, so nothing is committed and the old pin stands:
+      # a bad kernel week costs one failed Tuesday run, not a blocked build.
+      - name: Pin the kernel this image was built with
+        if: success() && (github.event_name == 'schedule' || inputs.fresh) && steps.kernel.outputs.candidate != '' && steps.kernel.outputs.candidate != steps.kernel.outputs.current
+        run: |
+          set -euo pipefail
+          candidate='${{ steps.kernel.outputs.candidate }}'
+          sed -i "s|^ARG KERNEL_PIN=.*|ARG KERNEL_PIN=${candidate}|" Containerfile
+          if git diff --exit-code Containerfile >/dev/null; then
+            echo "Containerfile already pins ${candidate}"; exit 0
+          fi
+          git config user.name  "hurunagus-builder"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "kernel: pin ${candidate} (weekly bump) [skip ci]" Containerfile
+          # Someone may push while this runs; retry on a rejected push instead of
+          # losing the pin. Pushes made with GITHUB_TOKEN do not start workflows, so
+          # this cannot loop back into another build.
+          for attempt in 1 2 3; do
+            if git push; then echo "pinned ${candidate}"; exit 0; fi
+            git pull --rebase --autostash || true
+            sleep 5
+          done
+          echo "::warning::could not push the kernel pin; the next weekly run retries"
 
