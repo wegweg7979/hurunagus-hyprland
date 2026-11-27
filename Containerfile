@@ -81,6 +81,16 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
 ## builds, and commits it on success (.github/workflows/build.yml) -- so a new
 ## kernel arrives on Tuesday, or not at all.
 ##
+## The kernel-devel tree stays with this phase on purpose: kernel-cachyos-devel
+## is what a machine's out-of-tree module builds against, and one does -- the
+## macbook's Wi-Fi driver is an akmod that compiles on that machine, with a
+## layered rpm, because no prebuilt kmod exists for this kernel. Dropping it would
+## save one package and break that machine's networking. It is also why the zstd
+## upgrade above is not optional: the devel tree drags a ~78 package Fedora
+## toolchain (gcc, perl, openssl-devel, libzstd-devel) into this transaction
+## (81 packages with -devel, 3 without), so a Fedora-side move in that set can
+## land under a base binary here. Measured, not assumed.
+##
 ## Declared here rather than with the ARGs above on purpose: a bump then
 ## invalidates this phase and everything after it, while the ~10 minute base layer
 ## stays cached.
