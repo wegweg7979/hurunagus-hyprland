@@ -25,7 +25,8 @@ The best of Linux in one distro.
 - Google drive ready to login.
 - Hyprglaze shader wallpaper- ported to fedora, menu bar widget controls.
 - Huruwave - Apple music and Youtube music player (paid accounts with those services required)- browser sign in needed. 
-- Hurutube - small Youtube video player: search, plays in mpv with GPU decoding (VA-API), Shorts refused on purpose.
+- Hurutube - small Youtube video player: no algorithm, no shorts, no likes. Just search and play.
+- Huru-wx - Detailed weather forcast & dashboard  
 - Pre-install list of flatpak software.
 - Hermes agent and opencode ready.
 - Btrfs maintenance - monthly checking.
