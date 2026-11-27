@@ -722,6 +722,17 @@ dnf5 remove -y \
     kernel-devel-matched || true
 rm -rf /usr/lib/modules/* || true
 
+# zstd and libzstd have to move together. The kernel packages below pull
+# kernel-cachyos-devel, which requires libzstd-devel, which requires an EXACT
+# libzstd — so the solver upgrades libzstd out from under the image's zstd CLI
+# (still the base's 1.5.7 build) and the CLI then refuses to run: "Error :
+# incorrect library version (expecting : 1.5.7 ; actual : 1.6.0 )". dracut
+# compresses the initramfs with zstd, so the run further down this block fails
+# with "Creation of initramfs.img failed" and the image ships without one.
+# Upgrade the CLI here, before the COPR is enabled, so it can only come from
+# Fedora's own repos.
+dnf5 upgrade -y zstd
+
 echo "Enabling ${KERNEL_COPR}"
 dnf5 -y copr enable "${KERNEL_COPR}"
 
