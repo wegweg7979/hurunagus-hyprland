@@ -14,7 +14,7 @@ Stability of Fedora. Immutability and build process of Silverblue. Omarchy bling
 The best of Linux in one distro. 
 
 
-- Omarchy ported to Fedora (Omedora).
+- Omarchy 4.5 ported to Fedora (Omedora).
 - Omedora forked and modified to function correctly on immutable Fedora (rpm-ostree / bootc).
 - CachyOS kernel — from the official CachyOS Fedora port: x86_64-v3 only.
 - Secure boot compatible (Enroll the key).
