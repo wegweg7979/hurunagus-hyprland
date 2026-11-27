@@ -1278,7 +1278,7 @@ Panel {
                   id: tempSparkMeasure
                   visible: false
                   text: "\u2588"
-                  font.family: root.bar.fontFamily
+                  font.family: root.pixelFamily
                   font.pixelSize: tempSpark.fontSize
                 }
 
@@ -1294,7 +1294,7 @@ Panel {
                     verticalAlignment: Text.AlignBottom
                     text: root.tempCells[index]
                     color: root.tempColor(root.hourTemps[index])
-                    font.family: root.bar.fontFamily
+                    font.family: root.pixelFamily
                     font.pixelSize: tempSpark.fontSize
                   }
                 }
@@ -1313,7 +1313,7 @@ Panel {
                   id: rainSparkMeasure
                   visible: false
                   text: "\u2588"
-                  font.family: root.bar.fontFamily
+                  font.family: root.pixelFamily
                   font.pixelSize: rainSpark.fontSize
                 }
 
@@ -1329,7 +1329,7 @@ Panel {
                     verticalAlignment: Text.AlignBottom
                     text: root.rainCells[index]
                     color: Qt.rgba(Commons.Color.accent.r, Commons.Color.accent.g, Commons.Color.accent.b, 0.85)
-                    font.family: root.bar.fontFamily
+                    font.family: root.pixelFamily
                     font.pixelSize: rainSpark.fontSize
                   }
                 }
@@ -1671,7 +1671,7 @@ Panel {
   // itself to fill its cells exactly whatever font the theme resolves to.
   TextMetrics {
     id: blockMetrics
-    font.family: root.bar.fontFamily
+    font.family: root.pixelFamily
     font.pixelSize: 100
     text: "\u2588"
   }
@@ -1679,6 +1679,18 @@ Panel {
   readonly property real blockAdvanceRatio: {
     var ratio = blockMetrics.advanceWidth / 100
     return (isFinite(ratio) && ratio > 0.2 && ratio < 1.5) ? ratio : 0.6
+  }
+
+  // The chart's block glyphs are drawn in the user's own HuruPixel face, so the
+  // ramp is in the same hand as the wordmark on the board. Checked rather than
+  // assumed: on a machine without it installed the chart falls back to the shell
+  // font. Both faces advance a block by 0.6em, so the sizing above holds either
+  // way.
+  readonly property string pixelFamily: {
+    var families = Qt.fontFamilies()
+    for (var i = 0; i < families.length; i++)
+      if (String(families[i]).toLowerCase() === "hurupixel") return "HuruPixel"
+    return root.bar.fontFamily
   }
 
   // A full-width rule with a centred, letter-spaced label: "-— LABEL —-".

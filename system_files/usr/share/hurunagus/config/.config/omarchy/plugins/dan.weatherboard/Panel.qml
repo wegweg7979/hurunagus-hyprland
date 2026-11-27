@@ -31,10 +31,11 @@ Item {
   readonly property color accentInk: Commons.Color.accent
   readonly property color surface: Qt.darker(Commons.Color.background, 1.12)
 
-  // The user's own HuruPixel face for the HURU-WX wordmark. Checked rather than
-  // assumed: on a machine without it installed the wordmark falls back to the
-  // shell font instead of quietly rendering in whatever Qt picks.
-  readonly property string wordmarkFamily: {
+  // The user's own HuruPixel face: the HURU-WX wordmark and the chart's block
+  // glyphs are drawn in it. Checked rather than assumed: on a machine without it
+  // installed both fall back to the shell font instead of quietly rendering in
+  // whatever Qt picks.
+  readonly property string pixelFamily: {
     var families = Qt.fontFamilies()
     for (var i = 0; i < families.length; i++)
       if (String(families[i]).toLowerCase() === "hurupixel") return "HuruPixel"
@@ -467,13 +468,22 @@ Item {
   // own type to fill the width whatever family the theme resolves to.
   TextMetrics {
     id: blockMetrics
-    font.family: Style.font.family
+    font.family: root.pixelFamily
     font.pixelSize: 100
     text: "\u2588"
   }
   readonly property real blockAdvanceRatio: {
     var ratio = blockMetrics.advanceWidth / 100
     return (isFinite(ratio) && ratio > 0.2 && ratio < 1.5) ? ratio : 0.6
+  }
+
+  // The ink height of one block as a fraction of the font size. The ramps divide
+  // their band height by it so the tallest bar fills the band exactly; measured
+  // rather than assumed, since it is 0.80 for HuruPixel's eight-cell block and
+  // 1.32 for the shell font's.
+  readonly property real blockHeightRatio: {
+    var ratio = blockMetrics.tightBoundingRect.height / 100
+    return (isFinite(ratio) && ratio > 0.2 && ratio < 2) ? ratio : 1.32
   }
 
   // ==========================================================================
@@ -536,50 +546,27 @@ Item {
                 font.family: Style.font.family
                 font.pixelSize: Style.font.heading
               }
-              // The wordmark, set in the user's own HuruPixel face. The dash
-              // between the halves is drawn rather than set: the font does
-              // carry a hyphen, but at header sizes it is a hairline next to
-              // these chunky caps, and a rectangle can be put on the same pixel
-              // grid the letters sit on.
+              // The wordmark, set in the user's own HuruPixel face -- the dash
+              // included. That dash used to be painted as a Rectangle because
+              // the face carried only a hyphen, a one-cell hairline beside these
+              // chunky caps; it now carries an em dash on the same cell grid
+              // (two cells tall, the full cap width), so this is one string.
               //
               // Size snapped to a multiple of 8: the face's stems are eighths of
               // an em, so 24px draws 3px stems where 21 or 22 draws blurry
               // halves. (Panel titles stay in the shell font for the same
               // reason: caption is 15px on this font scale.)
-              Row {
+              Text {
                 id: wordmark
+                textFormat: Text.PlainText
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: Math.round(wordmark.glyphSize * 0.2)
+                text: "HURU\u2014WX"
+                color: root.ink
+                font.family: root.pixelFamily
+                font.pixelSize: wordmark.glyphSize
+                font.letterSpacing: Math.round(wordmark.glyphSize * 0.16)
 
                 readonly property int glyphSize: Math.max(8, Math.round(Style.font.heading / 8) * 8)
-
-                Text {
-                  textFormat: Text.PlainText
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: "HURU"
-                  color: root.ink
-                  font.family: root.wordmarkFamily
-                  font.pixelSize: wordmark.glyphSize
-                  font.letterSpacing: Math.round(wordmark.glyphSize * 0.16)
-                }
-
-                Rectangle {
-                  anchors.verticalCenter: parent.verticalCenter
-                  width: Math.round(wordmark.glyphSize * 0.5)
-                  height: Math.max(2, Math.round(wordmark.glyphSize / 8))
-                  color: root.ink
-                  radius: 0
-                }
-
-                Text {
-                  textFormat: Text.PlainText
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: "WX"
-                  color: root.ink
-                  font.family: root.wordmarkFamily
-                  font.pixelSize: wordmark.glyphSize
-                  font.letterSpacing: Math.round(wordmark.glyphSize * 0.16)
-                }
               }
               Text {
                 textFormat: Text.PlainText
@@ -1056,7 +1043,7 @@ Item {
 
                   readonly property real cellWidth: width / Math.max(1, root.tempCells.length)
                   readonly property real fontSize: Math.max(Style.font.body,
-                    Math.min(tempRamp.cellWidth / Math.max(0.2, root.blockAdvanceRatio), tempRamp.height / 1.32))
+                    Math.min(tempRamp.cellWidth / Math.max(0.2, root.blockAdvanceRatio), tempRamp.height / Math.max(0.2, root.blockHeightRatio)))
 
                   Repeater {
                     model: root.tempCells.length
@@ -1070,7 +1057,7 @@ Item {
                       verticalAlignment: Text.AlignBottom
                       text: root.tempCells[index]
                       color: root.tempColor(root.hourTemps[index])
-                      font.family: Style.font.family
+                      font.family: root.pixelFamily
                       font.pixelSize: tempRamp.fontSize
                     }
                   }
@@ -1084,7 +1071,7 @@ Item {
 
                   readonly property real cellWidth: width / Math.max(1, root.rainCells.length)
                   readonly property real fontSize: Math.max(Style.font.caption,
-                    Math.min(rainRamp.cellWidth / Math.max(0.2, root.blockAdvanceRatio), rainRamp.height / 1.32))
+                    Math.min(rainRamp.cellWidth / Math.max(0.2, root.blockAdvanceRatio), rainRamp.height / Math.max(0.2, root.blockHeightRatio)))
                   // Too short a band for one glyph to reach the cell width, so
                   // each cell repeats its shade character to fill the slot: a
                   // textured band rather than a dotted line.
@@ -1103,7 +1090,7 @@ Item {
                       verticalAlignment: Text.AlignBottom
                       text: root.rainCells[index] === " " ? "" : root.rainCells[index].repeat(rainRamp.glyphRepeats)
                       color: Qt.rgba(root.accentInk.r, root.accentInk.g, root.accentInk.b, 0.85)
-                      font.family: Style.font.family
+                      font.family: root.pixelFamily
                       font.pixelSize: rainRamp.fontSize
                     }
                   }
