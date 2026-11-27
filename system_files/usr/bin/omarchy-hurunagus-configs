@@ -195,6 +195,15 @@ while IFS= read -r -d '' entry; do
         mkdir -p "$(dirname "$dst")"
         rm -f "$dst"
         cp -a "$entry" "$dst"
+        # cp -a keeps the payload's timestamp, and everything in the image is
+        # stamped 1970 for reproducibility. A file that keeps an old mtime reads
+        # as unchanged to mtime-keyed caches, and Quickshell's compiled-QML cache
+        # (~/.cache/quickshell/qmlcache) is one of them: replacing a plugin's QML
+        # this way left the shell running the OLD compiled component, so a new
+        # panel rendered while the previous version stayed on screen. Stamp the
+        # write instead -- content is what decides `identical` above, so this
+        # costs nothing on a replay.
+        touch "$dst"
       fi
       ;;
     backup)
@@ -204,9 +213,11 @@ while IFS= read -r -d '' entry; do
         printf 'backup\t%s\n' "$rel"
       else
         mkdir -p "$(dirname "$dst")"
+        # Keep the original's timestamp on the backup: it is the old file's.
         cp -a "$dst" "$dst.pre-hurunagus-$ts"
         rm -f "$dst"
         cp -a "$entry" "$dst"
+        touch "$dst"
       fi
       ;;
   esac
